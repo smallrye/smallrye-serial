@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.smallrye.serial</groupId>
+    <artifactId>smallrye-serial-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <parent>
+        <groupId>io.smallrye</groupId>
+        <artifactId>smallrye-parent</artifactId>
+        <version>51-SNAPSHOT</version>
+    </parent>
+
+    <packaging>pom</packaging>
+
+    <name>SmallRye Serial: Parent</name>
+    <url>https://smallrye.io</url>
+    <description>A safe and efficient Java serialization library</description>
+
+    <properties>
+        <jdk.min.version>25</jdk.min.version>
+
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
+
+        <version.smallrye-common>2.19.0</version.smallrye-common>
+    </properties>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/smallrye/smallrye-serial/issues</url>
+    </issueManagement>
+
+    <scm>
+        <connection>scm:git:git@github.com:smallrye/smallrye-serial.git</connection>
+        <developerConnection>scm:git:git@github.com:smallrye/smallrye-serial.git</developerConnection>
+        <url>https://github.com/smallrye/smallrye-serial/</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <modules>
+        <module>serial</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.smallrye.common</groupId>
+                <artifactId>smallrye-common-constraint</artifactId>
+                <version>${version.smallrye-common}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

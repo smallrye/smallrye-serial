@@ -1,0 +1,45 @@
+name: SmallRye Build
+env:
+  MAVEN_VERSION: 3.9.12
+  IO_TAKARI_MAVEN_WRAPPER_VERSION: 0.7.7
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.gitattributes'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'README*'
+  pull_request:
+    paths-ignore:
+      - '.gitattributes'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'README*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: build
+
+    steps:
+      - uses: actions/checkout@v7
+        name: checkout
+
+      - uses: actions/setup-java@v5
+        name: set up JDKs
+        with:
+          distribution: temurin
+          java-version: |
+            25
+          cache: 'maven'
+          cache-dependency-path: '**/pom.xml'
+
+      - name: build with maven
+        run: |
+          mvn -q -N "io.takari:maven:${{env.IO_TAKARI_MAVEN_WRAPPER_VERSION}}:wrapper" "-Dmaven=${{env.MAVEN_VERSION}}"
+          ./mvnw -B -ntp formatter:validate verify javadoc:javadoc --file pom.xml "-Djava25.home=${{env.JAVA_HOME_25_X64}}${{env.JAVA_HOME_25_ARM64}}"
