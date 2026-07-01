@@ -24,6 +24,6 @@ public final class BuiltInClassLoaderSerializer implements ObjectSerializer {
     }
 
     public int priority() {
-        return PRIORITY_CLASS;
+        return PRIORITY_CLASS_LOADER;
     }
 }

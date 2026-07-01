@@ -1,25 +1,34 @@
 package io.smallrye.serial;
 
+import java.lang.constant.ClassDesc;
+
 import io.smallrye.common.constraint.Assert;
 
 /**
  * The serialized representation of an array class.
- * Array class descriptors carry a reference to the component type's class descriptor,
- * in addition to the JVM array class name and class loader inherited from {@link SerializedClass}.
+ * Array class descriptors carry a reference to the component type's class descriptor
+ * and a serial version UID, in addition to the class descriptor and class loader
+ * inherited from {@link SerializedVersionedClass}.
+ * <p>
+ * Note: the Java serialization specification waives the requirement for matching
+ * serial version UIDs on array classes, so the UID value is not significant for
+ * compatibility purposes.
  */
-public final class SerializedArrayClass extends SerializedClass {
+public final class SerializedArrayClass extends SerializedVersionedClass {
 
     private final SerializedClass componentType;
 
     /**
      * Construct a new instance.
      *
-     * @param name the JVM array class name (e.g. {@code "[Ljava.lang.String;"}) (must not be {@code null})
+     * @param classDesc the class descriptor for the array type (must not be {@code null})
      * @param classLoader the serialized class loader (must not be {@code null} but may be {@link SerializedNull#INSTANCE})
+     * @param uid the serial version UID (not checked for arrays per the serialization specification)
      * @param componentType the class descriptor of the array's component type (must not be {@code null})
      */
-    public SerializedArrayClass(final String name, final Serialized classLoader, final SerializedClass componentType) {
-        super(name, classLoader);
+    public SerializedArrayClass(final ClassDesc classDesc, final Serialized classLoader, final long uid,
+            final SerializedClass componentType) {
+        super(classDesc, classLoader, uid);
         this.componentType = Assert.checkNotNullParam("componentType", componentType);
     }
 

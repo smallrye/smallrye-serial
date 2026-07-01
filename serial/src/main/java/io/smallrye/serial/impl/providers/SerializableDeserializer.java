@@ -3,10 +3,8 @@ package io.smallrye.serial.impl.providers;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InvalidObjectException;
-import java.io.ObjectStreamField;
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 
 import io.smallrye.serial.SerialData;
 import io.smallrye.serial.Serialized;
@@ -69,9 +67,8 @@ public final class SerializableDeserializer implements ObjectDeserializer {
             } else {
                 // no supertypes remain; just continue on
             }
-            final Map<String, ObjectStreamField> fields = remoteSer.streamFields();
             final SerialData item = data.get(idx);
-            CapturedObjectInputStream ois = new CapturedObjectInputStream(ctxt, local, object, fields,
+            CapturedObjectInputStream ois = new CapturedObjectInputStream(ctxt, local, object, remoteSer,
                     item.primitiveFieldData(), item.objectFieldData(), item.streamData());
             if (ReadUtil.hasReadObject(local)) {
                 ReadUtil.readObject(local, object, ois);

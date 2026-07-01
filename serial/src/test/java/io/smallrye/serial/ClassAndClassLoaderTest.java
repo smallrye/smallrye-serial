@@ -15,9 +15,9 @@ class ClassAndClassLoaderTest {
 
     @Test
     void serializableClassRoundTrip() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize(String.class);
+        Serialized serialized = ctx.serialize(java.util.ArrayList.class);
         assertInstanceOf(SerializedSerializableClass.class, serialized);
-        assertSame(String.class, ctx.deserialize(serialized));
+        assertSame(java.util.ArrayList.class, ctx.deserialize(serialized));
     }
 
     @Test
@@ -39,7 +39,7 @@ class ClassAndClassLoaderTest {
         Serialized serialized = ctx.serialize(int[].class);
         assertInstanceOf(SerializedArrayClass.class, serialized);
         SerializedArrayClass sac = (SerializedArrayClass) serialized;
-        assertInstanceOf(SerializedNonSerializableClass.class, sac.componentType());
+        assertInstanceOf(SerializedPrimitiveClass.class, sac.componentType());
         assertSame(int[].class, ctx.deserialize(serialized));
     }
 
@@ -50,6 +50,20 @@ class ClassAndClassLoaderTest {
         SerializedArrayClass outer = (SerializedArrayClass) serialized;
         assertInstanceOf(SerializedArrayClass.class, outer.componentType());
         assertSame(String[][].class, ctx.deserialize(serialized));
+    }
+
+    @Test
+    void specialSerializableStringRoundTrip() throws IOException, ClassNotFoundException {
+        Serialized serialized = ctx.serialize(String.class);
+        assertSame(SerializedSpecialSerializableClass.STRING, serialized);
+        assertSame(String.class, ctx.deserialize(serialized));
+    }
+
+    @Test
+    void specialSerializableEnumRoundTrip() throws IOException, ClassNotFoundException {
+        Serialized serialized = ctx.serialize(Enum.class);
+        assertSame(SerializedSpecialSerializableClass.ENUM, serialized);
+        assertSame(Enum.class, ctx.deserialize(serialized));
     }
 
     @Test
@@ -66,6 +80,16 @@ class ClassAndClassLoaderTest {
         Serialized serialized = ctx.serialize(platformCl);
         assertInstanceOf(SerializedBuiltInClassLoader.class, serialized);
         assertSame(platformCl, ctx.deserialize(serialized));
+    }
+
+    @Test
+    void bootClassLoaderRoundTrip() throws IOException, ClassNotFoundException {
+        // String is loaded by the boot class loader (null)
+        Serialized serialized = ctx.serialize(String.class);
+        assertInstanceOf(SerializedSpecialSerializableClass.class, serialized);
+        SerializedClass sc = (SerializedClass) serialized;
+        assertSame(SerializedBuiltInClassLoader.forBootClassLoader(), sc.classLoader());
+        assertSame(String.class, ctx.deserialize(serialized));
     }
 
     @Test

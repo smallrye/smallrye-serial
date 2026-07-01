@@ -29,7 +29,7 @@ class CapturingObjectOutputTest {
      * An immediately-closed stream produces no data blocks.
      */
     @Test
-    void emptyStream() throws IOException {
+    void emptyStream() {
         var out = new CapturingObjectOutput(null);
         out.close();
         assertTrue(out.streamData().isEmpty());
@@ -199,7 +199,7 @@ class CapturingObjectOutputTest {
      * Writing to a closed stream throws {@link IOException}.
      */
     @Test
-    void closedStreamWriteThrows() throws IOException {
+    void closedStreamWriteThrows() {
         var out = new CapturingObjectOutput(null);
         out.close();
         assertThrows(IOException.class, () -> out.writeInt(1));
@@ -233,7 +233,7 @@ class CapturingObjectOutputTest {
      * A flush on a fresh (idle) stream is a no-op.
      */
     @Test
-    void flushOnIdleStream() throws IOException {
+    void flushOnIdleStream() {
         var out = new CapturingObjectOutput(null);
         out.flush();
         out.close();

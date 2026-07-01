@@ -3,6 +3,7 @@ package io.smallrye.serial.impl.providers;
 import java.io.IOException;
 
 import io.smallrye.serial.Serialized;
+import io.smallrye.serial.SerializedArrayClass;
 import io.smallrye.serial.SerializedBooleanArray;
 import io.smallrye.serial.SerializedByteArray;
 import io.smallrye.serial.SerializedCharArray;
@@ -10,7 +11,6 @@ import io.smallrye.serial.SerializedDoubleArray;
 import io.smallrye.serial.SerializedFloatArray;
 import io.smallrye.serial.SerializedIntArray;
 import io.smallrye.serial.SerializedLongArray;
-import io.smallrye.serial.SerializedObjectArray;
 import io.smallrye.serial.SerializedShortArray;
 import io.smallrye.serial.impl.Util;
 import io.smallrye.serial.spi.ObjectSerializer;
@@ -19,7 +19,8 @@ import io.smallrye.serial.spi.ObjectSerializer;
  * Serializer that handles array objects (both primitive and object arrays).
  * <p>
  * Primitive arrays are serialized as their corresponding {@code Serialized*Array} types.
- * Object arrays are serialized as {@link SerializedObjectArray} with each element serialized recursively.
+ * Object arrays are serialized as {@link io.smallrye.serial.SerializedObjectArray SerializedObjectArray}
+ * with each element serialized recursively.
  */
 public final class ArraySerializer implements ObjectSerializer {
     /**
@@ -32,24 +33,20 @@ public final class ArraySerializer implements ObjectSerializer {
      * {@inheritDoc}
      */
     public Serialized serialize(final Context ctxt, final Object object) throws IOException {
-        if (object instanceof boolean[] a) {
-            return new SerializedBooleanArray(a);
-        } else if (object instanceof byte[] a) {
-            return new SerializedByteArray(a);
-        } else if (object instanceof char[] a) {
-            return new SerializedCharArray(a);
-        } else if (object instanceof short[] a) {
-            return new SerializedShortArray(a);
-        } else if (object instanceof int[] a) {
-            return new SerializedIntArray(a);
-        } else if (object instanceof long[] a) {
-            return new SerializedLongArray(a);
-        } else if (object instanceof float[] a) {
-            return new SerializedFloatArray(a);
-        } else if (object instanceof double[] a) {
-            return new SerializedDoubleArray(a);
-        } else if (object instanceof Object[] a) {
-            return Util.newSerializedObjectArray(a, ctxt);
+        Class<?> clazz = object.getClass();
+        if (clazz.isArray()) {
+            SerializedArrayClass arrayType = (SerializedArrayClass) ctxt.serialize(clazz);
+            return switch (clazz.descriptorString().charAt(1)) {
+                case 'Z' -> new SerializedBooleanArray(arrayType, (boolean[]) object);
+                case 'B' -> new SerializedByteArray(arrayType, (byte[]) object);
+                case 'C' -> new SerializedCharArray(arrayType, (char[]) object);
+                case 'S' -> new SerializedShortArray(arrayType, (short[]) object);
+                case 'I' -> new SerializedIntArray(arrayType, (int[]) object);
+                case 'J' -> new SerializedLongArray(arrayType, (long[]) object);
+                case 'F' -> new SerializedFloatArray(arrayType, (float[]) object);
+                case 'D' -> new SerializedDoubleArray(arrayType, (double[]) object);
+                default -> Util.newSerializedObjectArray((Object[]) object, ctxt);
+            };
         } else {
             return ctxt.next();
         }

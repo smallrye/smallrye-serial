@@ -4,13 +4,35 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.CapturingObjectOutputStream;
 import io.smallrye.serial.impl.WriteUtil;
 import io.smallrye.serial.spi.ObjectSerializer;
 
+/**
+ * The serialized representation of a {@link java.io.Serializable} object instance.
+ * This captures the per-class-level field data and any additional stream data
+ * produced by custom {@code writeObject} methods.
+ */
 public final class SerializedSerializable extends Serialized {
+
+    /**
+     * Functional interface for lazily reading serialization data during construction.
+     * Used by the wire-reader constructor to defer data reading until after this
+     * instance has been registered in the handle table for circular reference support.
+     */
+    @FunctionalInterface
+    public interface DataReader {
+        /**
+         * Read the per-class-level serialization data.
+         *
+         * @return the list of serial data entries, ordered from root to leaf (not {@code null})
+         * @throws IOException if an I/O error occurs while reading
+         */
+        List<SerialData> read() throws IOException;
+    }
 
     private final SerializedSerializableClass streamClass;
     private final List<SerialData> data;
@@ -25,6 +47,25 @@ public final class SerializedSerializable extends Serialized {
     public SerializedSerializable(final SerializedSerializableClass streamClass, final List<SerialData> data) {
         this.streamClass = Assert.checkNotNullParam("streamClass", streamClass);
         this.data = List.copyOf(data);
+    }
+
+    /**
+     * Construct a new instance from a wire stream, supporting circular references.
+     * The {@code preSet} callback is invoked with {@code this} before reading data,
+     * allowing the caller to register this instance in a handle table so that
+     * back-references encountered during data reading resolve correctly.
+     *
+     * @param streamClass the class descriptor (must not be {@code null})
+     * @param preSet callback to register this instance before data is read (must not be {@code null})
+     * @param dataReader supplier of the per-class-level serialization data (must not be {@code null})
+     * @throws IOException if an I/O error occurs while reading data
+     */
+    public SerializedSerializable(final SerializedSerializableClass streamClass,
+            final Consumer<Serialized> preSet,
+            final DataReader dataReader) throws IOException {
+        this.streamClass = Assert.checkNotNullParam("streamClass", streamClass);
+        Assert.checkNotNullParam("preSet", preSet).accept(this);
+        this.data = List.copyOf(Assert.checkNotNullParam("dataReader", dataReader).read());
     }
 
     /**
@@ -123,7 +164,7 @@ public final class SerializedSerializable extends Serialized {
             } else {
                 buildData(context, object, clazz.getSuperclass(), streamClass.superClass(), data);
                 try (CapturingObjectOutputStream oos = new CapturingObjectOutputStream(context, clazz, object,
-                        streamClass.streamFields())) {
+                        streamClass)) {
                     if (WriteUtil.hasWriteObject(clazz)) {
                         WriteUtil.writeObject(clazz, object, oos);
                     } else {

@@ -11,7 +11,12 @@ public sealed interface Prioritized permits ObjectDeserializer, ObjectSerializer
     /**
      * The priority of {@code readResolve}/{@code writeReplace} operations.
      */
-    int PRIORITY_REPLACE = 13_000;
+    int PRIORITY_REPLACE = 14_000;
+
+    /**
+     * The priority of class loader serialization.
+     */
+    int PRIORITY_CLASS_LOADER = 13_000;
 
     /**
      * The priority of {@code Class} serialization.

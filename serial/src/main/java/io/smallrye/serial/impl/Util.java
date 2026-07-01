@@ -1,6 +1,7 @@
 package io.smallrye.serial.impl;
 
 import java.io.IOException;
+import java.lang.constant.ClassDesc;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -17,6 +18,56 @@ import io.smallrye.serial.spi.ObjectSerializer;
 
 public final class Util {
     private Util() {
+    }
+
+    /**
+     * A thread-safe cache mapping {@link Class} instances to their corresponding {@link ClassDesc}.
+     * Uses {@link ClassValue} for efficient, GC-friendly per-class caching.
+     */
+    private static final ClassValue<ClassDesc> CLASS_DESC_CACHE = new ClassValue<>() {
+        @Override
+        protected ClassDesc computeValue(Class<?> type) {
+            return type.describeConstable().orElseThrow();
+        }
+    };
+
+    /**
+     * Get the {@link ClassDesc} for the given class, using a cached value if available.
+     *
+     * @param clazz the class (must not be {@code null})
+     * @return the class descriptor (not {@code null})
+     */
+    public static ClassDesc classDesc(Class<?> clazz) {
+        return CLASS_DESC_CACHE.get(clazz);
+    }
+
+    /**
+     * Convert a {@link Class#getName()}-format class name to a {@link ClassDesc}.
+     * Regular class names like {@code "java.lang.String"} pass through {@link ClassDesc#of(String)}.
+     * Array names like {@code "[Ljava.lang.String;"} have dots replaced with slashes before
+     * passing to {@link ClassDesc#ofDescriptor(String)}.
+     *
+     * @param className the class name in {@link Class#getName()} format (must not be {@code null})
+     * @return the class descriptor (not {@code null})
+     */
+    public static ClassDesc classDescOfName(String className) {
+        if (className.startsWith("[")) {
+            return ClassDesc.ofDescriptor(className.replace('.', '/'));
+        }
+        return ClassDesc.of(className);
+    }
+
+    /**
+     * Compare two {@link ClassDesc} instances for equality by comparing their descriptor strings.
+     * This avoids the JDK's {@link ClassDesc#equals(Object)} implementation which has
+     * performance issues in certain cases.
+     *
+     * @param a the first class descriptor (must not be {@code null})
+     * @param b the second class descriptor (must not be {@code null})
+     * @return {@code true} if the two descriptors represent the same type
+     */
+    public static boolean classDescEquals(ClassDesc a, ClassDesc b) {
+        return a.descriptorString().equals(b.descriptorString());
     }
 
     public static final VarHandle BE16 = MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.BIG_ENDIAN)

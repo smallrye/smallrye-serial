@@ -1,7 +1,7 @@
 package io.smallrye.serial;
 
-import java.io.ObjectStreamField;
-import java.util.Map;
+import java.lang.constant.ClassDesc;
+import java.util.List;
 
 /**
  * Abstract base for class descriptors that carry a stream field layout.
@@ -11,34 +11,64 @@ import java.util.Map;
 public abstract sealed class SerializedFieldedClass extends SerializedVersionedClass
         permits SerializedSerializableClass, SerializedRecordClass {
 
-    private final Map<String, ObjectStreamField> fieldIndex;
+    private final List<SerialField> fields;
     private final int primitiveBufferSize;
     private final int objectBufferSize;
 
     /**
      * Construct a new instance.
      *
-     * @param name the class name (must not be {@code null})
+     * @param classDesc the class descriptor (must not be {@code null})
      * @param classLoader the serialized class loader (must not be {@code null} but may be {@link SerializedNull#INSTANCE})
      * @param uid the serial version UID
-     * @param fieldIndex the field index map (must not be {@code null})
+     * @param fields the stream fields, sorted by {@linkplain SerialField#name() name} (must not be {@code null})
      * @param primitiveBufferSize the size of the primitive buffer for this class
      * @param objectBufferSize the size of the object buffer for this class
      */
-    SerializedFieldedClass(final String name, final Serialized classLoader, final long uid,
-            final Map<String, ObjectStreamField> fieldIndex, final int primitiveBufferSize, final int objectBufferSize) {
-        super(name, classLoader, uid);
-        this.fieldIndex = Map.copyOf(fieldIndex);
+    SerializedFieldedClass(final ClassDesc classDesc, final Serialized classLoader, final long uid,
+            final List<SerialField> fields, final int primitiveBufferSize, final int objectBufferSize) {
+        super(classDesc, classLoader, uid);
+        this.fields = List.copyOf(fields);
         this.primitiveBufferSize = primitiveBufferSize;
         this.objectBufferSize = objectBufferSize;
     }
 
     /**
-     * {@return the serializable stream field layout for this class}
-     * The returned map excludes any {@code transient} or {@code static} fields.
+     * Look up a stream field by name using binary search.
+     *
+     * @param name the field name (must not be {@code null})
+     * @return the field descriptor, or {@code null} if no field with the given name exists
      */
-    public Map<String, ObjectStreamField> streamFields() {
-        return fieldIndex;
+    public SerialField streamField(String name) {
+        // binary search on the name-sorted field list
+        int lo = 0, hi = fields.size() - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            int cmp = fields.get(mid).name().compareTo(name);
+            if (cmp < 0) {
+                lo = mid + 1;
+            } else if (cmp > 0) {
+                hi = mid - 1;
+            } else {
+                return fields.get(mid);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * {@return the serializable stream field layout for this class, sorted by name}
+     * The returned list excludes any {@code transient} or {@code static} fields.
+     */
+    public List<SerialField> streamFields() {
+        return fields;
+    }
+
+    /**
+     * {@return the number of stream fields in this class's field layout}
+     */
+    public int streamFieldCount() {
+        return fields.size();
     }
 
     /**

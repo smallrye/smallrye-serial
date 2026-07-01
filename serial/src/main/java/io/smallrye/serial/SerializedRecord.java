@@ -1,12 +1,11 @@
 package io.smallrye.serial;
 
 import java.io.IOException;
-import java.io.ObjectStreamField;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.RecordComponent;
 import java.util.List;
-import java.util.Map;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.ClassLocal;
@@ -33,7 +32,15 @@ public final class SerializedRecord extends Serialized {
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(type, MethodHandles.lookup());
             for (int i = 0; i < components.length; i++) {
-                handles[i] = lookup.unreflect(components[i].getAccessor());
+                MethodHandle mh = lookup.unreflect(components[i].getAccessor());
+                Class<?> returnType = mh.type().returnType();
+                if (returnType.isPrimitive()) {
+                    // adapt receiver to Object, keep primitive return type for invokeExact
+                    handles[i] = mh.asType(MethodType.methodType(returnType, Object.class));
+                } else {
+                    // adapt both receiver and return type to Object for invokeExact
+                    handles[i] = mh.asType(MethodType.methodType(Object.class, Object.class));
+                }
             }
         } catch (IllegalAccessException e) {
             throw Util.asError(e);
@@ -71,7 +78,6 @@ public final class SerializedRecord extends Serialized {
         ctxt.preSetSerialized(this);
 
         Class<?> recordType = record.getClass();
-        Map<String, ObjectStreamField> fields = recordClass.streamFields();
         int primSize = recordClass.primitiveBufferSize();
         int objSize = recordClass.objectBufferSize();
         byte[] primData = primSize == 0 ? null : new byte[primSize];
@@ -81,34 +87,37 @@ public final class SerializedRecord extends Serialized {
         MethodHandle[] accessors = ((SerialContext.SerializerContextImpl) ctxt).classLocal(RECORD_ACCESSORS, recordType);
 
         for (int i = 0; i < components.length; i++) {
-            ObjectStreamField field = fields.get(components[i].getName());
+            SerialField field = recordClass.streamField(components[i].getName());
             if (field == null) {
                 // component is not in the serializable field set (transient, etc.)
                 continue;
             }
-            Object value;
+            MethodHandle accessor = accessors[i];
             try {
-                value = accessors[i].invoke(record);
+                if (field.isPrimitive()) {
+                    assert primData != null;
+                    int offset = field.offset();
+                    switch (field.typeCode()) {
+                        case 'Z' -> primData[offset] = (byte) ((boolean) accessor.invokeExact(record) ? 1 : 0);
+                        case 'B' -> primData[offset] = (byte) accessor.invokeExact(record);
+                        case 'C' -> Util.BE16.set(primData, offset, (short) (char) accessor.invokeExact(record));
+                        case 'S' -> Util.BE16.set(primData, offset, (short) accessor.invokeExact(record));
+                        case 'I' -> Util.BE32.set(primData, offset, (int) accessor.invokeExact(record));
+                        case 'J' -> Util.BE64.set(primData, offset, (long) accessor.invokeExact(record));
+                        case 'F' -> Util.BE32.set(primData, offset,
+                                Float.floatToRawIntBits((float) accessor.invokeExact(record)));
+                        case 'D' -> Util.BE64.set(primData, offset,
+                                Double.doubleToRawLongBits((double) accessor.invokeExact(record)));
+                        default -> throw Assert.impossibleSwitchCase(field.typeCode());
+                    }
+                } else {
+                    assert objData != null;
+                    objData[field.offset()] = ctxt.serialize((Object) accessor.invokeExact(record));
+                }
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable e) {
                 throw Util.sneak(e);
-            }
-            if (field.isPrimitive()) {
-                int offset = field.getOffset();
-                switch (field.getTypeCode()) {
-                    case 'Z' -> primData[offset] = (byte) ((boolean) value ? 1 : 0);
-                    case 'B' -> primData[offset] = (byte) value;
-                    case 'C' -> Util.BE16.set(primData, offset, (short) (char) value);
-                    case 'S' -> Util.BE16.set(primData, offset, (short) value);
-                    case 'I' -> Util.BE32.set(primData, offset, (int) value);
-                    case 'J' -> Util.BE64.set(primData, offset, (long) value);
-                    case 'F' -> Util.BE32.set(primData, offset, Float.floatToRawIntBits((float) value));
-                    case 'D' -> Util.BE64.set(primData, offset, Double.doubleToRawLongBits((double) value));
-                    default -> throw Assert.impossibleSwitchCase(field.getTypeCode());
-                }
-            } else {
-                objData[field.getOffset()] = ctxt.serialize(value);
             }
         }
 

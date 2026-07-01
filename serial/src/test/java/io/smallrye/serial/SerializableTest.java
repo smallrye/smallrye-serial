@@ -149,8 +149,8 @@ class SerializableTest {
         SerializedSerializableClass sc = ss.serializedClass();
         assertInstanceOf(SerializedSerializableClass.class, sc);
         assertEquals(SimplePoint.class.getName(), sc.name());
-        assertTrue(sc.streamFields().containsKey("x"));
-        assertTrue(sc.streamFields().containsKey("y"));
+        assertNotNull(sc.streamField("x"));
+        assertNotNull(sc.streamField("y"));
         assertEquals(1, ss.data().size());
     }
 }

@@ -2,13 +2,13 @@ package io.smallrye.serial.impl.providers;
 
 import java.io.IOException;
 import java.io.InvalidClassException;
-import java.io.ObjectStreamField;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.RecordComponent;
 
 import io.smallrye.serial.SerialData;
+import io.smallrye.serial.SerialField;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedRecord;
 import io.smallrye.serial.SerializedRecordClass;
@@ -42,14 +42,14 @@ public final class RecordDeserializer implements ObjectDeserializer {
             Object[] args = new Object[components.length];
             for (int i = 0; i < components.length; i++) {
                 RecordComponent comp = components[i];
-                ObjectStreamField osf = recClass.streamFields().get(comp.getName());
-                if (osf == null) {
+                SerialField sf = recClass.streamField(comp.getName());
+                if (sf == null) {
                     // component not present in the stream — use type default
                     args[i] = defaultValue(comp.getType());
-                } else if (osf.isPrimitive()) {
-                    args[i] = readPrimitive(fieldData, osf);
+                } else if (sf.isPrimitive()) {
+                    args[i] = readPrimitive(fieldData, sf);
                 } else {
-                    args[i] = ctxt.deserialize(fieldData.objectFieldData().getObject(osf.getOffset()));
+                    args[i] = ctxt.deserialize(fieldData.objectFieldData().getObject(sf.offset()));
                 }
             }
 
@@ -72,9 +72,9 @@ public final class RecordDeserializer implements ObjectDeserializer {
     /**
      * Read a primitive field value from the field data, boxed for use as a constructor argument.
      */
-    private static Object readPrimitive(SerialData fieldData, ObjectStreamField osf) {
-        int offset = osf.getOffset();
-        return switch (osf.getTypeCode()) {
+    private static Object readPrimitive(SerialData fieldData, SerialField sf) {
+        int offset = sf.offset();
+        return switch (sf.typeCode()) {
             case 'Z' -> fieldData.primitiveFieldData().getBoolean(offset);
             case 'B' -> fieldData.primitiveFieldData().getByte(offset);
             case 'C' -> fieldData.primitiveFieldData().getChar(offset);
@@ -83,7 +83,7 @@ public final class RecordDeserializer implements ObjectDeserializer {
             case 'J' -> fieldData.primitiveFieldData().getLong(offset);
             case 'F' -> fieldData.primitiveFieldData().getFloat(offset);
             case 'D' -> fieldData.primitiveFieldData().getDouble(offset);
-            default -> throw new IllegalStateException("Unknown primitive type code: " + osf.getTypeCode());
+            default -> throw new IllegalStateException("Unknown primitive type code: " + sf.typeCode());
         };
     }
 

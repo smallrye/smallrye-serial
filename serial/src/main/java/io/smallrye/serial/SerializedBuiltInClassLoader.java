@@ -1,11 +1,12 @@
 package io.smallrye.serial;
 
 /**
- * The serialized representation of a built-in (platform or application) class loader.
+ * The serialized representation of a built-in class loader (boot, platform, or application).
  * These class loaders are singletons within a JVM, so they are represented as
  * singleton instances rather than by name.
  */
 public final class SerializedBuiltInClassLoader extends Serialized {
+    private static final SerializedBuiltInClassLoader BOOT = new SerializedBuiltInClassLoader(Kind.BOOT);
     private static final SerializedBuiltInClassLoader PLATFORM = new SerializedBuiltInClassLoader(Kind.PLATFORM);
     private static final SerializedBuiltInClassLoader APP = new SerializedBuiltInClassLoader(Kind.APP);
 
@@ -16,10 +17,24 @@ public final class SerializedBuiltInClassLoader extends Serialized {
     }
 
     /**
-     * {@return the class loader represented by this serialized form (not {@code null})}
+     * {@return the kind of built-in class loader this instance represents (not {@code null})}
+     */
+    public Kind kind() {
+        return kind;
+    }
+
+    /**
+     * {@return the class loader represented by this serialized form, or {@code null} for the boot class loader}
      */
     public ClassLoader classLoader() {
         return kind.classLoader;
+    }
+
+    /**
+     * {@return the singleton instance representing the boot (null) class loader}
+     */
+    public static SerializedBuiltInClassLoader forBootClassLoader() {
+        return BOOT;
     }
 
     /**
@@ -40,6 +55,10 @@ public final class SerializedBuiltInClassLoader extends Serialized {
      * The kind of built-in class loader.
      */
     public enum Kind {
+        /**
+         * The boot (null) class loader.
+         */
+        BOOT(null),
         /**
          * The platform class loader.
          */

@@ -14,16 +14,14 @@ public final class BuiltInClassLoaderDeserializer implements ObjectDeserializer 
     }
 
     public Object deserialize(final Context ctxt, final Serialized serialized) throws IOException, ClassNotFoundException {
-        if (serialized == SerializedBuiltInClassLoader.forAppClassLoader()) {
-            return ClassLoader.getSystemClassLoader();
-        } else if (serialized == SerializedBuiltInClassLoader.forPlatformClassLoader()) {
-            return ClassLoader.getPlatformClassLoader();
+        if (serialized instanceof SerializedBuiltInClassLoader b) {
+            return b.classLoader();
         } else {
             return ctxt.next();
         }
     }
 
     public int priority() {
-        return PRIORITY_CLASS;
+        return PRIORITY_CLASS_LOADER;
     }
 }

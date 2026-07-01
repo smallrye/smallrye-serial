@@ -5,12 +5,12 @@ import static io.smallrye.serial.impl.Util.*;
 import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
-import java.io.ObjectStreamField;
 import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 
+import io.smallrye.serial.SerialField;
 import io.smallrye.serial.Serialized;
+import io.smallrye.serial.SerializedFieldedClass;
 import io.smallrye.serial.StreamData;
 import io.smallrye.serial.spi.ObjectSerializer;
 
@@ -23,7 +23,7 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
     private final ObjectSerializer.Context context;
     private final Class<?> serialClass;
     private final Object serialObject;
-    private final Map<String, ObjectStreamField> fields;
+    private final SerializedFieldedClass fieldedClass;
 
     /**
      * The capturing stream for data written after the field data is written.
@@ -55,37 +55,14 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
 
     public CapturingObjectOutputStream(final ObjectSerializer.Context context, final Class<?> serialClass,
             final Object serialObject,
-            final Map<String, ObjectStreamField> fields) throws IOException {
+            final SerializedFieldedClass fieldedClass) throws IOException {
         super();
         this.context = context;
         this.serialClass = serialClass;
         this.serialObject = serialObject;
-        this.fields = fields;
-        // compute the data sizes
-        int pds = 0, ods = 0;
-        for (ObjectStreamField field : fields.values()) {
-            int size = switch (field.getTypeCode()) {
-                case '[', 'L' -> 0;
-                case 'B', 'Z' -> 1;
-                case 'C', 'S' -> 2;
-                case 'I', 'F' -> 4;
-                case 'J', 'D' -> 8;
-                default -> throw new IllegalStateException();
-            };
-            int end = size + field.getOffset();
-            if (end > pds) {
-                pds = end;
-            }
-            size = switch (field.getTypeCode()) {
-                case '[', 'L' -> 1;
-                case 'B', 'Z', 'C', 'S', 'I', 'F', 'J', 'D' -> 0;
-                default -> throw new IllegalStateException();
-            };
-            end = size + field.getOffset();
-            if (end > ods) {
-                ods = end;
-            }
-        }
+        this.fieldedClass = fieldedClass;
+        int pds = fieldedClass.primitiveBufferSize();
+        int ods = fieldedClass.objectBufferSize();
         primFields = pds == 0 ? null : new byte[pds];
         objFields = ods == 0 ? null : new Object[ods];
         serializedFields = ods == 0 ? null : new Serialized[ods];
@@ -320,12 +297,12 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
     }
 
     private int offs(String name, boolean primitive) {
-        ObjectStreamField field = fields.get(name);
+        SerialField field = fieldedClass.streamField(name);
         if (field == null) {
             throw new IllegalArgumentException("The given stream field name " + name + " does not exist");
         }
         if (field.isPrimitive() == primitive) {
-            return field.getOffset();
+            return field.offset();
         } else {
             throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
         }

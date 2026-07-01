@@ -4,15 +4,8 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 
 import io.smallrye.serial.Serialized;
-import io.smallrye.serial.SerializedBooleanArray;
-import io.smallrye.serial.SerializedByteArray;
-import io.smallrye.serial.SerializedCharArray;
-import io.smallrye.serial.SerializedDoubleArray;
-import io.smallrye.serial.SerializedFloatArray;
-import io.smallrye.serial.SerializedIntArray;
-import io.smallrye.serial.SerializedLongArray;
+import io.smallrye.serial.SerializedArray;
 import io.smallrye.serial.SerializedObjectArray;
-import io.smallrye.serial.SerializedShortArray;
 import io.smallrye.serial.spi.ObjectDeserializer;
 
 /**
@@ -32,23 +25,7 @@ public final class ArrayDeserializer implements ObjectDeserializer {
      * {@inheritDoc}
      */
     public Object deserialize(final Context ctxt, final Serialized serialized) throws IOException, ClassNotFoundException {
-        if (serialized instanceof SerializedBooleanArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedByteArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedCharArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedShortArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedIntArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedLongArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedFloatArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedDoubleArray a) {
-            return a.asArray();
-        } else if (serialized instanceof SerializedObjectArray a) {
+        if (serialized instanceof SerializedObjectArray a) {
             Class<?> arrayClass = ctxt.deserializeClass(a.arrayType());
             Class<?> componentType = arrayClass.getComponentType();
             int length = a.length();
@@ -58,6 +35,8 @@ public final class ArrayDeserializer implements ObjectDeserializer {
                 result[i] = ctxt.deserialize(a.get(i));
             }
             return result;
+        } else if (serialized instanceof SerializedArray a) {
+            return a.asArray();
         } else {
             return ctxt.next();
         }

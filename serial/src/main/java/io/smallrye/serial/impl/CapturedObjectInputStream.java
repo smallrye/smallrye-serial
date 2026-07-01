@@ -6,11 +6,11 @@ import java.io.NotActiveException;
 import java.io.ObjectInputStream;
 import java.io.ObjectInputValidation;
 import java.io.ObjectStreamClass;
-import java.io.ObjectStreamField;
 import java.util.List;
-import java.util.Map;
 
 import io.smallrye.common.constraint.Assert;
+import io.smallrye.serial.SerialField;
+import io.smallrye.serial.SerializedFieldedClass;
 import io.smallrye.serial.StreamData;
 import io.smallrye.serial.spi.ObjectDeserializer;
 
@@ -22,7 +22,7 @@ public final class CapturedObjectInputStream extends ObjectInputStream {
     private final ObjectDeserializer.Context context;
     private final Class<?> serialClass;
     private final Object serialObject;
-    private final Map<String, ObjectStreamField> fields;
+    private final SerializedFieldedClass fieldedClass;
     private final StreamData.OfBytes primData;
     private final StreamData.OfObjects objectData;
     private final List<StreamData> streamData;
@@ -32,12 +32,12 @@ public final class CapturedObjectInputStream extends ObjectInputStream {
 
     public CapturedObjectInputStream(final ObjectDeserializer.Context context, final Class<?> serialClass,
             final Object serialObject,
-            final Map<String, ObjectStreamField> fields, final StreamData.OfBytes primData,
+            final SerializedFieldedClass fieldedClass, final StreamData.OfBytes primData,
             final StreamData.OfObjects objectData, final List<StreamData> streamData) throws IOException {
         this.context = context;
         this.serialClass = serialClass;
         this.serialObject = serialObject;
-        this.fields = Map.copyOf(fields);
+        this.fieldedClass = fieldedClass;
         this.primData = primData;
         this.objectData = objectData;
         this.streamData = List.copyOf(streamData);
@@ -197,44 +197,45 @@ public final class CapturedObjectInputStream extends ObjectInputStream {
         }
 
         public boolean defaulted(final String name) {
-            return !fields.containsKey(name);
+            return fieldedClass.streamField(name) == null;
         }
 
         public boolean get(final String name, final boolean val) {
-            return fields.containsKey(name) ? primData.getBoolean(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getBoolean(offs(name, true)) : val;
         }
 
         public byte get(final String name, final byte val) {
-            return fields.containsKey(name) ? primData.getByte(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getByte(offs(name, true)) : val;
         }
 
         public char get(final String name, final char val) {
-            return fields.containsKey(name) ? primData.getChar(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getChar(offs(name, true)) : val;
         }
 
         public short get(final String name, final short val) {
-            return fields.containsKey(name) ? primData.getShort(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getShort(offs(name, true)) : val;
         }
 
         public int get(final String name, final int val) {
-            return fields.containsKey(name) ? primData.getInt(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getInt(offs(name, true)) : val;
         }
 
         public long get(final String name, final long val) {
-            return fields.containsKey(name) ? primData.getLong(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getLong(offs(name, true)) : val;
         }
 
         public float get(final String name, final float val) {
-            return fields.containsKey(name) ? primData.getFloat(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getFloat(offs(name, true)) : val;
         }
 
         public double get(final String name, final double val) {
-            return fields.containsKey(name) ? primData.getDouble(offs(name, true)) : val;
+            return fieldedClass.streamField(name) != null ? primData.getDouble(offs(name, true)) : val;
         }
 
         public Object get(final String name, final Object val) throws /* TODO: JDK 18+ ClassNotFoundException, */ IOException {
             try {
-                return fields.containsKey(name) ? context.deserialize(objectData.getObject(offs(name, false))) : val;
+                return fieldedClass.streamField(name) != null ? context.deserialize(objectData.getObject(offs(name, false)))
+                        : val;
             } catch (ClassNotFoundException e) {
                 throw Util.sneak(e);
             }
@@ -242,9 +243,9 @@ public final class CapturedObjectInputStream extends ObjectInputStream {
     }
 
     private int offs(String name, boolean primitive) {
-        ObjectStreamField field = fields.get(name);
+        SerialField field = fieldedClass.streamField(name);
         if (field.isPrimitive() == primitive) {
-            return field.getOffset();
+            return field.offset();
         } else {
             throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
         }

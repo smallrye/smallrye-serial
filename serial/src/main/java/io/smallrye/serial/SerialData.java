@@ -1,8 +1,6 @@
 package io.smallrye.serial;
 
-import java.io.ObjectStreamField;
 import java.util.List;
-import java.util.Map;
 
 import io.smallrye.common.constraint.Assert;
 
@@ -34,9 +32,8 @@ public record SerialData(
      * @return the stream field descriptor (not {@code null})
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
-    private ObjectStreamField field(String fieldName) {
-        Map<String, ObjectStreamField> fields = serializedClass.streamFields();
-        ObjectStreamField field = fields.get(Assert.checkNotNullParam("fieldName", fieldName));
+    private SerialField field(String fieldName) {
+        SerialField field = serializedClass.streamField(Assert.checkNotNullParam("fieldName", fieldName));
         if (field == null) {
             throw new IllegalArgumentException("No field named '" + fieldName + "' in class " + serializedClass.name());
         }
@@ -51,7 +48,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public boolean getBoolean(String fieldName) {
-        return primitiveFieldData.getBoolean(field(fieldName).getOffset());
+        return primitiveFieldData.getBoolean(field(fieldName).offset());
     }
 
     /**
@@ -62,7 +59,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public byte getByte(String fieldName) {
-        return primitiveFieldData.getByte(field(fieldName).getOffset());
+        return primitiveFieldData.getByte(field(fieldName).offset());
     }
 
     /**
@@ -73,7 +70,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public char getChar(String fieldName) {
-        return primitiveFieldData.getChar(field(fieldName).getOffset());
+        return primitiveFieldData.getChar(field(fieldName).offset());
     }
 
     /**
@@ -84,7 +81,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public short getShort(String fieldName) {
-        return primitiveFieldData.getShort(field(fieldName).getOffset());
+        return primitiveFieldData.getShort(field(fieldName).offset());
     }
 
     /**
@@ -95,7 +92,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public int getInt(String fieldName) {
-        return primitiveFieldData.getInt(field(fieldName).getOffset());
+        return primitiveFieldData.getInt(field(fieldName).offset());
     }
 
     /**
@@ -106,7 +103,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public long getLong(String fieldName) {
-        return primitiveFieldData.getLong(field(fieldName).getOffset());
+        return primitiveFieldData.getLong(field(fieldName).offset());
     }
 
     /**
@@ -117,7 +114,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public float getFloat(String fieldName) {
-        return primitiveFieldData.getFloat(field(fieldName).getOffset());
+        return primitiveFieldData.getFloat(field(fieldName).offset());
     }
 
     /**
@@ -128,7 +125,7 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public double getDouble(String fieldName) {
-        return primitiveFieldData.getDouble(field(fieldName).getOffset());
+        return primitiveFieldData.getDouble(field(fieldName).offset());
     }
 
     /**
@@ -139,6 +136,6 @@ public record SerialData(
      * @throws IllegalArgumentException if no field with the given name exists at this class level
      */
     public Serialized getObject(String fieldName) {
-        return objectFieldData.getObject(field(fieldName).getOffset());
+        return objectFieldData.getObject(field(fieldName).offset());
     }
 }

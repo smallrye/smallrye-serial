@@ -284,7 +284,7 @@ class CapturedObjectInputTest {
     @Test
     void readBytesAtObjectPositionThrows() {
         var input = new CapturedObjectInput(null,
-                List.of(StreamData.of(new Serialized[] { SerializedNull.INSTANCE })));
+                List.of(StreamData.of(SerializedNull.INSTANCE)));
         assertThrows(IOException.class, input::readInt);
     }
 

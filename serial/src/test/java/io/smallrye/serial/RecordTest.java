@@ -66,7 +66,7 @@ class RecordTest {
         SerializedRecordClass rc = sr.recordClass();
         assertInstanceOf(SerializedRecordClass.class, rc);
         assertEquals(SimpleRecord.class.getName(), rc.name());
-        assertTrue(rc.streamFields().containsKey("x"));
-        assertTrue(rc.streamFields().containsKey("y"));
+        assertNotNull(rc.streamField("x"));
+        assertNotNull(rc.streamField("y"));
     }
 }

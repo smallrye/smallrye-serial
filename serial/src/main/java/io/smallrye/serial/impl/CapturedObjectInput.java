@@ -4,7 +4,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.NotActiveException;
 import java.io.ObjectInput;
-import java.io.UTFDataFormatException;
 import java.util.List;
 import java.util.Objects;
 
@@ -266,45 +265,8 @@ public final class CapturedObjectInput implements ObjectInput {
 
     public String readUTF() throws IOException {
         int len = readUnsignedShort();
-        StringBuilder sb = new StringBuilder(len >> 1);
-        int i = 0;
-        while (i < len) {
-            int a = readUnsignedByte();
-            // count leading ones
-            switch (Integer.numberOfLeadingZeros(~a)) {
-                // one-byte character
-                case 0 -> {
-                    sb.append((char) a);
-                    i++;
-                }
-                // two-byte character
-                case 2 -> {
-                    if (i + 1 >= len) {
-                        throw new UTFDataFormatException();
-                    }
-                    int b = readUnsignedByte();
-                    if ((b & 0xc0) != 0x80) {
-                        throw new UTFDataFormatException();
-                    }
-                    sb.append((char) ((a & 0x1F) << 6 | b & 0x3F));
-                    i += 2;
-                }
-                // three-byte character
-                case 3 -> {
-                    if (i + 2 >= len) {
-                        throw new UTFDataFormatException();
-                    }
-                    int b = readUnsignedShort();
-                    if ((b & 0xc0c0) != 0x8080) {
-                        throw new UTFDataFormatException();
-                    }
-                    // todo: JDK 19+ Integer.compress(b, 0x3F3F)
-                    sb.append((char) ((a & 0x0F) << 12 | (b & 0x3F00) >> 2 | b & 0x3F));
-                    i += 3;
-                }
-                default -> throw new UTFDataFormatException();
-            }
-        }
-        return sb.toString();
+        byte[] buf = new byte[len];
+        readFully(buf);
+        return ModifiedUtf8.decode(buf, 0, len);
     }
 }

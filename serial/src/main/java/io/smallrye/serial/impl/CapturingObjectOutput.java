@@ -155,43 +155,15 @@ public final class CapturingObjectOutput implements ObjectOutput {
     }
 
     public void writeUTF(final String str) throws IOException {
-        // estimate
-        if (str.length() > 0xffff) {
-            // we can tell right away
+        long encodedLen = ModifiedUtf8.encodedLength(str);
+        if (encodedLen > 0xffff) {
             throw new UTFDataFormatException("String is too long");
         }
-        // rough guess to avoid lots of small reallocations
-        ensureSpace(2 + str.length());
-        int len = 0;
-        // placeholder to hold the actual length
-        int lenIdx = bufferSize;
+        int len = (int) encodedLen;
+        ensureSpace(2 + len);
+        BE16.set(buffer, bufferSize, (short) len);
         bufferSize += 2;
-        for (int i = 0; i < str.length(); i++) {
-            final char c = str.charAt(i);
-            if (c > 0 && c <= 0x7f) {
-                ensureSpace(1);
-                len++;
-                buffer[bufferSize++] = (byte) c;
-            } else if (c <= 0x7ff) {
-                ensureSpace(2);
-                len += 2;
-                // todo: JDK 19+ use Integer.expand + BE16
-                buffer[bufferSize++] = (byte) (0xc0 | 0x1f & c >> 6);
-                buffer[bufferSize++] = (byte) (0x80 | 0x3f & c);
-            } else {
-                ensureSpace(3);
-                len += 3;
-                // todo: JDK 19+ use Integer.expand + BE32 + ensureSpace(4)
-                buffer[bufferSize++] = (byte) (0xe0 | 0x0f & c >> 12);
-                buffer[bufferSize++] = (byte) (0x80 | 0x3f & c >> 6);
-                buffer[bufferSize++] = (byte) (0x80 | 0x3f & c);
-            }
-            if (len > 0xffff) {
-                throw new UTFDataFormatException("String is too long");
-            }
-        }
-        // update with the actual length
-        BE16.set(buffer, lenIdx, (short) len);
+        bufferSize += ModifiedUtf8.encode(str, buffer, bufferSize);
     }
 
     public void flush() {
