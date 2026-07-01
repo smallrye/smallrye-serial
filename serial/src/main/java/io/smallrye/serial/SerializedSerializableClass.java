@@ -17,7 +17,7 @@ import io.smallrye.serial.impl.Util;
  * serializable class descriptors carry a reference to the nearest serializable superclass
  * in the serialization hierarchy.
  */
-public final class SerializedSerializableClass extends SerializedFieldedClass {
+public final class SerializedSerializableClass extends SerializedFieldedClass implements HasSuperClass {
 
     private final SerializedSerializableClass superClass;
     private final boolean hasWriteMethod;
@@ -48,6 +48,7 @@ public final class SerializedSerializableClass extends SerializedFieldedClass {
      * {@return the nearest serializable superclass descriptor in the serialization hierarchy,
      * or {@code null} if there is none}
      */
+    @Override
     public SerializedSerializableClass superClass() {
         return superClass;
     }

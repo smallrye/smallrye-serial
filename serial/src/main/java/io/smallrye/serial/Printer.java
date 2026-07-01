@@ -482,6 +482,11 @@ public final class Printer {
             }
             openBlock();
             printVersionedClassBody(ec);
+            if (ec.superClass() != null) {
+                newLine();
+                sb.append("superClass: ");
+                printValue(ec.superClass());
+            }
             closeBlock();
         }
 
@@ -561,6 +566,11 @@ public final class Printer {
                 newLine();
                 sb.append("classLoader: ");
                 printValue(pc.classLoader());
+            }
+            if (pc.superClass() != null) {
+                newLine();
+                sb.append("superClass: ");
+                printValue(pc.superClass());
             }
             closeBlock();
         }

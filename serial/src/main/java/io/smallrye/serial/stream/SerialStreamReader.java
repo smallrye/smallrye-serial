@@ -56,10 +56,14 @@ import io.smallrye.serial.impl.Util;
  * back-references. It mirrors the handle assignment order of the standard
  * serialization protocol so that back-references resolve to the same objects
  * they would in a standard {@link java.io.ObjectInputStream}.
+ * <p>
+ * This class implements {@link SerialInput} so that the
+ * {@link ClassAnnotationReader} callback can read arbitrary data (block data
+ * and {@link Serialized} objects) from the stream during class annotation processing.
  *
  * @see SerialStreamWriter
  */
-public final class SerialStreamReader implements Closeable {
+public final class SerialStreamReader implements SerialInput, Closeable {
 
     // ---- Wire format constants ----
 
@@ -105,6 +109,18 @@ public final class SerialStreamReader implements Closeable {
     private final ArrayList<Serialized> handles = new ArrayList<>();
     /** Current nesting depth. */
     private int depth;
+
+    // Block data read state (for ObjectInput methods inside ClassAnnotationReader callbacks)
+    /** Whether the reader is currently inside a block data reading context. */
+    private boolean blockDataMode;
+    /** Bytes remaining in the current block data segment. */
+    private int blockDataRemaining;
+    /** Whether {@code TC_ENDBLOCKDATA} has already been consumed during block data reading. */
+    private boolean endOfBlockData;
+    /** A peeked non-block-data type code, or {@code -1} if none. */
+    private int peekTC = -1;
+    /** Temporary buffer for multi-byte primitive reads that may cross block boundaries. */
+    private final byte[] primReadBuf = new byte[8];
 
     // ---- Builder ----
 
@@ -204,13 +220,19 @@ public final class SerialStreamReader implements Closeable {
     // ---- Public API ----
 
     /**
-     * Read a single top-level {@link Serialized} object from the stream.
-     * Returns {@code null} at end-of-stream if no more objects are available.
-     *
-     * @return the deserialized object, or {@code null} at end-of-stream
-     * @throws IOException if an I/O error or protocol error occurs
+     * {@inheritDoc}
+     * <p>
+     * When called at the top level, reads the next object from the stream and
+     * returns {@code null} at end-of-stream.
+     * When called inside a {@link ClassAnnotationReader} callback (block data mode),
+     * skips any remaining block data to find the next embedded object, and returns
+     * {@code null} at the end of the annotation block ({@code TC_ENDBLOCKDATA}).
      */
+    @Override
     public Serialized readSerialized() throws IOException {
+        if (blockDataMode) {
+            return readSerializedInBlockMode();
+        }
         try {
             return readObject0();
         } catch (EOFException e) {
@@ -258,7 +280,7 @@ public final class SerialStreamReader implements Closeable {
         } else if (tc == TC_LONGSTRING) {
             return readLongString();
         } else if (tc == TC_OBJECT) {
-            return readObject();
+            return readTcObject();
         } else if (tc == TC_ARRAY) {
             return readArray();
         } else if (tc == TC_ENUM) {
@@ -493,7 +515,8 @@ public final class SerialStreamReader implements Closeable {
         if (isEnum) {
             return new SerializedEnumClass(cd, SerializedBuiltInClassLoader.forBootClassLoader(), uid);
         } else if (isExternalizable) {
-            return new SerializedExternalizableClass(cd, SerializedBuiltInClassLoader.forBootClassLoader(), uid);
+            SerializedClass extSuper = superDesc instanceof SerializedClass sc ? sc : null;
+            return new SerializedExternalizableClass(cd, SerializedBuiltInClassLoader.forBootClassLoader(), uid, extSuper);
         } else if (isSerializable) {
             if (name.startsWith("[")) {
                 // array class descriptor
@@ -576,30 +599,67 @@ public final class SerialStreamReader implements Closeable {
         readClassAnnotation();
 
         // superclass descriptor (typically java.lang.reflect.Proxy)
-        readClassDescOrRef();
+        Serialized rawSuperDesc = readClassDescOrRef();
+        SerializedClass proxySuperClass = rawSuperDesc instanceof SerializedClass sc ? sc : null;
 
         SerializedProxyClass proxyClass = new SerializedProxyClass(ifaceNames,
-                SerializedBuiltInClassLoader.forBootClassLoader());
+                SerializedBuiltInClassLoader.forBootClassLoader(), proxySuperClass);
         handles.set(handleIndex, proxyClass);
         return proxyClass;
     }
 
     /**
      * Read and skip (or delegate to the callback) the class annotation data,
-     * terminated by TC_ENDBLOCKDATA.
+     * terminated by {@code TC_ENDBLOCKDATA}.
+     * <p>
+     * When a {@link ClassAnnotationReader} callback is configured, block data mode
+     * is entered before invoking the callback so that the callback can use this
+     * reader's {@link SerialInput} methods ({@link #readInt()}, {@link #readSerialized()},
+     * etc.) to consume annotation data. After the callback returns, any unconsumed
+     * annotation data is skipped up to and including the {@code TC_ENDBLOCKDATA} marker.
+     *
+     * @throws IOException if an I/O error or protocol error occurs
      */
     private void readClassAnnotation() throws IOException {
         if (classAnnotationReader != null) {
-            classAnnotationReader.read(this);
+            blockDataMode = true;
+            blockDataRemaining = 0;
+            endOfBlockData = false;
+            peekTC = -1;
+            try {
+                classAnnotationReader.read(this);
+            } finally {
+                blockDataMode = false;
+            }
         }
-        skipAnnotation();
+        if (!endOfBlockData) {
+            skipAnnotation();
+        }
+        endOfBlockData = false;
+        peekTC = -1;
     }
 
     /**
-     * Skip content until TC_ENDBLOCKDATA is encountered.
-     * Handles nested block data and embedded objects.
+     * Skip content until {@code TC_ENDBLOCKDATA} is encountered.
+     * Handles residual block data state from the callback (remaining bytes in the
+     * current segment, a peeked type code), then reads and discards any remaining
+     * block data and embedded objects.
+     *
+     * @throws IOException if an I/O error or protocol error occurs
      */
     private void skipAnnotation() throws IOException {
+        // skip remaining bytes from a partially-consumed block data segment
+        if (blockDataRemaining > 0) {
+            skipNBytes(blockDataRemaining);
+            blockDataRemaining = 0;
+        }
+        // process peeked TC if any (always an object TC, never block data or end marker)
+        if (peekTC >= 0) {
+            byte tc = (byte) peekTC;
+            peekTC = -1;
+            readObject0(tc);
+        }
+        // read remaining TCs until TC_ENDBLOCKDATA
         for (;;) {
             byte tc = in.readByte();
             if (tc == TC_ENDBLOCKDATA) {
@@ -612,7 +672,6 @@ public final class SerialStreamReader implements Closeable {
                 int len = in.readInt();
                 skipNBytes(len);
             } else {
-                // nested object — read and discard
                 readObject0(tc);
             }
         }
@@ -625,7 +684,7 @@ public final class SerialStreamReader implements Closeable {
      *
      * @return the deserialized object node (not {@code null})
      */
-    private Serialized readObject() throws IOException {
+    private Serialized readTcObject() throws IOException {
         Serialized classDescNode = readClassDescOrRef();
 
         if (classDescNode instanceof SerializedProxyClass proxyClass) {
@@ -949,6 +1008,405 @@ public final class SerialStreamReader implements Closeable {
         // assign handle for the Class *value* (distinct from the class descriptor handle)
         assignHandle(classDesc);
         return classDesc;
+    }
+
+    // ---- SerialInput / DataInput implementation ----
+
+    /**
+     * Read the next {@link Serialized} object from within a block data context.
+     * Skips any remaining block data (current segment and subsequent segments)
+     * until a non-block-data type code is encountered.
+     *
+     * @return the deserialized object, or {@code null} if {@code TC_ENDBLOCKDATA} is reached
+     * @throws IOException if an I/O error or protocol error occurs
+     */
+    private Serialized readSerializedInBlockMode() throws IOException {
+        // skip remaining bytes in current block
+        if (blockDataRemaining > 0) {
+            skipNBytes(blockDataRemaining);
+            blockDataRemaining = 0;
+        }
+        // check for a previously peeked object TC
+        if (peekTC >= 0) {
+            byte tc = (byte) peekTC;
+            peekTC = -1;
+            return readObject0(tc);
+        }
+        // skip block data segments until we find an object or end marker
+        for (;;) {
+            byte tc = in.readByte();
+            if (tc == TC_BLOCKDATA) {
+                skipNBytes(in.readUnsignedByte());
+            } else if (tc == TC_BLOCKDATALONG) {
+                skipNBytes(in.readInt());
+            } else if (tc == TC_ENDBLOCKDATA) {
+                endOfBlockData = true;
+                blockDataMode = false;
+                return null;
+            } else {
+                return readObject0(tc);
+            }
+        }
+    }
+
+    /**
+     * Read a single byte from block data.
+     * Returns {@code -1} if the end of block data has been reached.
+     *
+     * @return the byte read (0–255), or {@code -1} at end of block data
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public int read() throws IOException {
+        checkBlockDataMode();
+        return readBlockByte();
+    }
+
+    /**
+     * Read bytes from block data into a byte array.
+     * Returns the number of bytes actually read, or {@code -1} if the end of
+     * block data has been reached before any bytes could be read.
+     *
+     * @param b the buffer to read into (not {@code null})
+     * @return the number of bytes read, or {@code -1} at end of block data
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public int read(final byte[] b) throws IOException {
+        return read(b, 0, b.length);
+    }
+
+    /**
+     * Read bytes from block data into a portion of a byte array.
+     * Returns the number of bytes actually read, or {@code -1} if the end of
+     * block data has been reached before any bytes could be read.
+     *
+     * @param b the buffer to read into (not {@code null})
+     * @param off the start offset in the buffer
+     * @param len the maximum number of bytes to read
+     * @return the number of bytes read, or {@code -1} at end of block data
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public int read(final byte[] b, final int off, final int len) throws IOException {
+        checkBlockDataMode();
+        if (len == 0) {
+            return 0;
+        }
+        if (blockDataRemaining == 0 && !refillBlockData()) {
+            return -1;
+        }
+        int n = Math.min(len, blockDataRemaining);
+        in.readFully(b, off, n);
+        blockDataRemaining -= n;
+        return n;
+    }
+
+    /**
+     * Skip up to {@code n} bytes of block data.
+     *
+     * @param n the number of bytes to skip
+     * @return the actual number of bytes skipped
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public long skip(final long n) throws IOException {
+        checkBlockDataMode();
+        if (n <= 0) {
+            return 0;
+        }
+        if (blockDataRemaining == 0 && !refillBlockData()) {
+            return 0;
+        }
+        long toSkip = Math.min(n, blockDataRemaining);
+        skipNBytes(toSkip);
+        blockDataRemaining -= (int) toSkip;
+        return toSkip;
+    }
+
+    /**
+     * {@return the number of bytes of block data known to be immediately available
+     * without blocking (the remaining bytes in the current block segment)}
+     *
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public int available() throws IOException {
+        if (!blockDataMode) {
+            return 0;
+        }
+        return blockDataRemaining;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void readFully(final byte[] b) throws IOException {
+        readFully(b, 0, b.length);
+    }
+
+    /**
+     * Read exactly {@code len} bytes from block data into the given buffer.
+     *
+     * @param b the buffer to read into (not {@code null})
+     * @param off the start offset in the buffer
+     * @param len the number of bytes to read
+     * @throws EOFException if the end of block data is reached before all bytes are read
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public void readFully(final byte[] b, final int off, final int len) throws IOException {
+        checkBlockDataMode();
+        readBlockFully(b, off, len);
+    }
+
+    /**
+     * Skip exactly {@code n} bytes of block data.
+     *
+     * @param n the number of bytes to skip
+     * @return the number of bytes actually skipped (always {@code n})
+     * @throws EOFException if the end of block data is reached before all bytes are skipped
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public int skipBytes(final int n) throws IOException {
+        checkBlockDataMode();
+        if (n <= 0) {
+            return 0;
+        }
+        skipBlockData(n);
+        return n;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean readBoolean() throws IOException {
+        int b = read();
+        if (b < 0) {
+            throw new EOFException("end of block data");
+        }
+        return b != 0;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public byte readByte() throws IOException {
+        int b = read();
+        if (b < 0) {
+            throw new EOFException("end of block data");
+        }
+        return (byte) b;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int readUnsignedByte() throws IOException {
+        int b = read();
+        if (b < 0) {
+            throw new EOFException("end of block data");
+        }
+        return b;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public short readShort() throws IOException {
+        checkBlockDataMode();
+        if (blockDataRemaining >= 2) {
+            blockDataRemaining -= 2;
+            return in.readShort();
+        }
+        readBlockFully(primReadBuf, 0, 2);
+        return (short) Util.BE16.get(primReadBuf, 0);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int readUnsignedShort() throws IOException {
+        return readShort() & 0xFFFF;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public char readChar() throws IOException {
+        return (char) readShort();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int readInt() throws IOException {
+        checkBlockDataMode();
+        if (blockDataRemaining >= 4) {
+            blockDataRemaining -= 4;
+            return in.readInt();
+        }
+        readBlockFully(primReadBuf, 0, 4);
+        return (int) Util.BE32.get(primReadBuf, 0);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public long readLong() throws IOException {
+        checkBlockDataMode();
+        if (blockDataRemaining >= 8) {
+            blockDataRemaining -= 8;
+            return in.readLong();
+        }
+        readBlockFully(primReadBuf, 0, 8);
+        return (long) Util.BE64.get(primReadBuf, 0);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public float readFloat() throws IOException {
+        return Float.intBitsToFloat(readInt());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public double readDouble() throws IOException {
+        return Double.longBitsToDouble(readLong());
+    }
+
+    /**
+     * This method is not supported.
+     *
+     * @return never returns normally
+     * @throws UnsupportedOperationException always
+     * @deprecated Use {@link #readUTF()} instead.
+     */
+    @Deprecated
+    @Override
+    public String readLine() {
+        throw new UnsupportedOperationException("readLine is not supported");
+    }
+
+    /**
+     * Read a modified UTF-8 encoded string from block data.
+     * Reads a 2-byte length prefix followed by that many bytes of modified UTF-8 data.
+     *
+     * @return the decoded string (not {@code null})
+     * @throws EOFException if the end of block data is reached before all data is read
+     * @throws IllegalStateException if not in block data mode
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public String readUTF() throws IOException {
+        int utfLen = readUnsignedShort();
+        byte[] buf = new byte[utfLen];
+        readFully(buf);
+        return ModifiedUtf8.decode(buf, 0, utfLen);
+    }
+
+    // ---- Block data read helpers ----
+
+    /**
+     * Assert that the reader is currently in block data mode.
+     *
+     * @throws IllegalStateException if not in block data mode
+     */
+    private void checkBlockDataMode() {
+        if (!blockDataMode) {
+            throw new IllegalStateException(
+                    "DataInput methods are only available inside a ClassAnnotationReader callback");
+        }
+    }
+
+    /**
+     * Read a single byte from block data, automatically refilling when the current
+     * segment is exhausted.
+     *
+     * @return the byte read (0–255), or {@code -1} at end of block data
+     * @throws IOException if an I/O error occurs
+     */
+    private int readBlockByte() throws IOException {
+        if (blockDataRemaining == 0 && !refillBlockData()) {
+            return -1;
+        }
+        blockDataRemaining--;
+        return in.readUnsignedByte();
+    }
+
+    /**
+     * Read exactly {@code len} bytes from block data into the given buffer,
+     * crossing block segment boundaries as needed.
+     *
+     * @param b the buffer to read into (not {@code null})
+     * @param off the start offset in the buffer
+     * @param len the number of bytes to read
+     * @throws EOFException if the end of block data is reached before all bytes are read
+     * @throws IOException if an I/O error occurs
+     */
+    private void readBlockFully(final byte[] b, int off, int len) throws IOException {
+        while (len > 0) {
+            if (blockDataRemaining == 0 && !refillBlockData()) {
+                throw new EOFException("end of block data");
+            }
+            int n = Math.min(len, blockDataRemaining);
+            in.readFully(b, off, n);
+            blockDataRemaining -= n;
+            off += n;
+            len -= n;
+        }
+    }
+
+    /**
+     * Skip exactly {@code count} bytes of block data, crossing block segment
+     * boundaries as needed.
+     *
+     * @param count the number of bytes to skip
+     * @throws EOFException if the end of block data is reached before all bytes are skipped
+     * @throws IOException if an I/O error occurs
+     */
+    private void skipBlockData(int count) throws IOException {
+        while (count > 0) {
+            if (blockDataRemaining == 0 && !refillBlockData()) {
+                throw new EOFException("end of block data");
+            }
+            int n = Math.min(count, blockDataRemaining);
+            skipNBytes(n);
+            blockDataRemaining -= n;
+            count -= n;
+        }
+    }
+
+    /**
+     * Attempt to start reading the next block data segment.
+     * Reads the next type code from the stream and, if it is a block data header,
+     * sets {@link #blockDataRemaining} to the segment length.
+     *
+     * @return {@code true} if a new block data segment was found, {@code false} if
+     *         the end of block data was reached or a non-block-data type code was encountered
+     * @throws IOException if an I/O error occurs
+     */
+    private boolean refillBlockData() throws IOException {
+        if (peekTC >= 0) {
+            return false;
+        }
+        byte tc = in.readByte();
+        if (tc == TC_BLOCKDATA) {
+            blockDataRemaining = in.readUnsignedByte();
+            return true;
+        } else if (tc == TC_BLOCKDATALONG) {
+            blockDataRemaining = in.readInt();
+            if (blockDataRemaining < 0) {
+                throw new StreamCorruptedException("negative block data length");
+            }
+            return true;
+        } else if (tc == TC_ENDBLOCKDATA) {
+            endOfBlockData = true;
+            blockDataMode = false;
+            return false;
+        } else {
+            peekTC = tc;
+            return false;
+        }
     }
 
     // ---- Annotation / block data reading ----

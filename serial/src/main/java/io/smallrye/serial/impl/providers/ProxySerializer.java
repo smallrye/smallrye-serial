@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import io.smallrye.serial.Serialized;
+import io.smallrye.serial.SerializedClass;
 import io.smallrye.serial.SerializedProxyClass;
 import io.smallrye.serial.impl.Util;
 import io.smallrye.serial.spi.ObjectSerializer;
@@ -30,7 +31,8 @@ public final class ProxySerializer implements ObjectSerializer {
                     .map(Class::getName)
                     .collect(Collectors.toUnmodifiableList());
             Serialized classLoader = ctxt.serialize(object.getClass().getClassLoader());
-            SerializedProxyClass proxyClass = new SerializedProxyClass(interfaceNames, classLoader);
+            SerializedClass superClass = (SerializedClass) ctxt.serialize(Proxy.class);
+            SerializedProxyClass proxyClass = new SerializedProxyClass(interfaceNames, classLoader, superClass);
             return Util.newSerializedProxyObject(object, proxyClass, ctxt);
         } else {
             return ctxt.next();
