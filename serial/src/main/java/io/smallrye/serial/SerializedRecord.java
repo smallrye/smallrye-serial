@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.util.List;
 
@@ -30,7 +31,8 @@ public final class SerializedRecord extends Serialized {
         RecordComponent[] components = type.getRecordComponents();
         MethodHandle[] handles = new MethodHandle[components.length];
         try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(type, MethodHandles.lookup());
+            MethodHandles.Lookup lookup = Modifier.isPublic(type.getModifiers()) ? MethodHandles.lookup().in(type)
+                    : MethodHandles.privateLookupIn(type, MethodHandles.lookup());
             for (int i = 0; i < components.length; i++) {
                 MethodHandle mh = lookup.unreflect(components[i].getAccessor());
                 Class<?> returnType = mh.type().returnType();
