@@ -494,6 +494,10 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         if (isEnum) {
             return new SerializedEnumClass(cd, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid);
         } else if (isExternalizable) {
+            if ((flags & SC_BLOCK_DATA) == 0) {
+                throw new StreamCorruptedException(
+                        "Pre-1.2 externalizable stream (SC_BLOCK_DATA not set) cannot be structurally parsed");
+            }
             SerializedClass extSuper = superDesc instanceof SerializedClass sc ? sc : null;
             return new SerializedExternalizableClass(cd, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid, extSuper);
         } else if (isSerializable) {
