@@ -1,5 +1,7 @@
 package io.smallrye.serial.stream;
 
+import static io.smallrye.serial.stream.SerialProtocol.*;
+
 import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.EOFException;
@@ -65,36 +67,6 @@ import io.smallrye.serial.impl.Util;
  * @see SerialStreamWriter
  */
 public final class SerialStreamReader implements SerialInput, Closeable {
-
-    // ---- Wire format constants ----
-
-    private static final short STREAM_MAGIC = (short) 0xACED;
-    private static final short STREAM_VERSION = 5;
-    private static final int BASE_WIRE_HANDLE = 0x7E0000;
-
-    // Type codes
-    private static final byte TC_NULL = 0x70;
-    private static final byte TC_REFERENCE = 0x71;
-    private static final byte TC_CLASSDESC = 0x72;
-    private static final byte TC_OBJECT = 0x73;
-    private static final byte TC_STRING = 0x74;
-    private static final byte TC_ARRAY = 0x75;
-    private static final byte TC_CLASS = 0x76;
-    private static final byte TC_BLOCKDATA = 0x77;
-    private static final byte TC_ENDBLOCKDATA = 0x78;
-    private static final byte TC_RESET = 0x79;
-    private static final byte TC_BLOCKDATALONG = 0x7A;
-    private static final byte TC_EXCEPTION = 0x7B;
-    private static final byte TC_LONGSTRING = 0x7C;
-    private static final byte TC_PROXYCLASSDESC = 0x7D;
-    private static final byte TC_ENUM = 0x7E;
-
-    // Class descriptor flags
-    private static final byte SC_WRITE_METHOD = 0x01;
-    private static final byte SC_SERIALIZABLE = 0x02;
-    private static final byte SC_EXTERNALIZABLE = 0x04;
-    private static final byte SC_BLOCK_DATA = 0x08;
-    private static final byte SC_ENUM = 0x10;
 
     // ---- Instance fields ----
 
