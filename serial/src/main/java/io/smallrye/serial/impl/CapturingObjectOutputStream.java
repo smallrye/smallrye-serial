@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.io.UncheckedIOException;
 import java.util.List;
 
+import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.SerialField;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedFieldedClass;
@@ -223,13 +224,16 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
     private CapturingObjectOutput objectOutput() throws IOException {
         switch (state) {
             case ST_INITIAL -> throw noObjectStreamFields();
+            case ST_STREAM -> {
+                CapturingObjectOutput objectOutput = this.objectOutput;
+                if (objectOutput == null) {
+                    objectOutput = this.objectOutput = new CapturingObjectOutput(context);
+                }
+                return objectOutput;
+            }
             case ST_CLOSED -> throw closed();
+            default -> throw Assert.impossibleSwitchCase(state);
         }
-        CapturingObjectOutput objectOutput = this.objectOutput;
-        if (objectOutput == null) {
-            objectOutput = this.objectOutput = new CapturingObjectOutput(context);
-        }
-        return objectOutput;
     }
 
     private static IOException noObjectStreamFields() {
@@ -246,39 +250,39 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
 
     private final class PutFieldImpl extends PutField {
         public void put(final String name, final boolean val) {
-            primFields[offs(name, true)] = (byte) (val ? 1 : 0);
+            primFields[primOffset(name)] = (byte) (val ? 1 : 0);
         }
 
         public void put(final String name, final byte val) {
-            primFields[offs(name, true)] = val;
+            primFields[primOffset(name)] = val;
         }
 
         public void put(final String name, final char val) {
-            BE16.set(primFields, offs(name, true), (short) val);
+            BE16.set(primFields, primOffset(name), (short) val);
         }
 
         public void put(final String name, final short val) {
-            BE16.set(primFields, offs(name, true), val);
+            BE16.set(primFields, primOffset(name), val);
         }
 
         public void put(final String name, final int val) {
-            BE32.set(primFields, offs(name, true), val);
+            BE32.set(primFields, primOffset(name), val);
         }
 
         public void put(final String name, final long val) {
-            BE64.set(primFields, offs(name, true), val);
+            BE64.set(primFields, primOffset(name), val);
         }
 
         public void put(final String name, final float val) {
-            BE32.set(primFields, offs(name, true), Float.floatToRawIntBits(val));
+            BE32.set(primFields, primOffset(name), Float.floatToRawIntBits(val));
         }
 
         public void put(final String name, final double val) {
-            BE64.set(primFields, offs(name, true), Double.doubleToRawLongBits(val));
+            BE64.set(primFields, primOffset(name), Double.doubleToRawLongBits(val));
         }
 
         public void put(final String name, final Object val) {
-            objFields[offs(name, false)] = val;
+            objFields[objOffset(name)] = val;
         }
 
         @SuppressWarnings("removal")
@@ -296,15 +300,25 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
         }
     }
 
-    private int offs(String name, boolean primitive) {
+    private int primOffset(String name) {
         SerialField field = fieldedClass.streamField(name);
         if (field == null) {
             throw new IllegalArgumentException("The given stream field name " + name + " does not exist");
         }
-        if (field.isPrimitive() == primitive) {
+        if (field.isPrimitive()) {
             return field.offset();
-        } else {
-            throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
         }
+        throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
+    }
+
+    private int objOffset(String name) {
+        SerialField field = fieldedClass.streamField(name);
+        if (field == null) {
+            throw new IllegalArgumentException("The given stream field name " + name + " does not exist");
+        }
+        if (!field.isPrimitive()) {
+            return field.offset();
+        }
+        throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
     }
 }

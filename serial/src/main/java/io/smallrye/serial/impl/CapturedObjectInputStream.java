@@ -201,53 +201,66 @@ public final class CapturedObjectInputStream extends ObjectInputStream {
         }
 
         public boolean get(final String name, final boolean val) {
-            return fieldedClass.streamField(name) != null ? primData.getBoolean(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getBoolean(primOffset(name, field)) : val;
         }
 
         public byte get(final String name, final byte val) {
-            return fieldedClass.streamField(name) != null ? primData.getByte(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getByte(primOffset(name, field)) : val;
         }
 
         public char get(final String name, final char val) {
-            return fieldedClass.streamField(name) != null ? primData.getChar(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getChar(primOffset(name, field)) : val;
         }
 
         public short get(final String name, final short val) {
-            return fieldedClass.streamField(name) != null ? primData.getShort(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getShort(primOffset(name, field)) : val;
         }
 
         public int get(final String name, final int val) {
-            return fieldedClass.streamField(name) != null ? primData.getInt(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getInt(primOffset(name, field)) : val;
         }
 
         public long get(final String name, final long val) {
-            return fieldedClass.streamField(name) != null ? primData.getLong(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getLong(primOffset(name, field)) : val;
         }
 
         public float get(final String name, final float val) {
-            return fieldedClass.streamField(name) != null ? primData.getFloat(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getFloat(primOffset(name, field)) : val;
         }
 
         public double get(final String name, final double val) {
-            return fieldedClass.streamField(name) != null ? primData.getDouble(offs(name, true)) : val;
+            SerialField field = fieldedClass.streamField(name);
+            return field != null ? primData.getDouble(primOffset(name, field)) : val;
         }
 
         public Object get(final String name, final Object val) throws /* TODO: JDK 18+ ClassNotFoundException, */ IOException {
+            SerialField field = fieldedClass.streamField(name);
             try {
-                return fieldedClass.streamField(name) != null ? context.deserialize(objectData.getObject(offs(name, false)))
-                        : val;
+                return field != null ? context.deserialize(objectData.getObject(objOffset(name, field))) : val;
             } catch (ClassNotFoundException e) {
                 throw Util.sneak(e);
             }
         }
     }
 
-    private int offs(String name, boolean primitive) {
-        SerialField field = fieldedClass.streamField(name);
-        if (field.isPrimitive() == primitive) {
+    private static int primOffset(String name, SerialField field) {
+        if (field.isPrimitive()) {
             return field.offset();
-        } else {
-            throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
         }
+        throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
+    }
+
+    private static int objOffset(String name, SerialField field) {
+        if (!field.isPrimitive()) {
+            return field.offset();
+        }
+        throw new IllegalArgumentException("Field " + name + " has an unexpected kind");
     }
 }

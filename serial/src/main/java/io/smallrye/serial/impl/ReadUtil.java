@@ -35,7 +35,7 @@ public final class ReadUtil {
     };
     static final ClassValue<MethodHandle> defaultReadObjects = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
-            // todo: inline on JDK 22+
+            // todo: inline on JDK 24+ (MR-JAR layer already handles this)
             return JDK24Specific.defaultReadObjectForSerialization(type);
         }
     };

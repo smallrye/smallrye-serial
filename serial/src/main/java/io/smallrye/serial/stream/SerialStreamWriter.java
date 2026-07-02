@@ -1,5 +1,7 @@
 package io.smallrye.serial.stream;
 
+import static io.smallrye.serial.stream.SerialProtocol.*;
+
 import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -63,34 +65,6 @@ import io.smallrye.serial.impl.Util;
  */
 public final class SerialStreamWriter implements SerialOutput, Closeable {
 
-    // ---- Wire format constants ----
-
-    private static final short STREAM_MAGIC = (short) 0xACED;
-    private static final short STREAM_VERSION = 5;
-    private static final int BASE_WIRE_HANDLE = 0x7E0000;
-
-    // Type codes
-    private static final byte TC_NULL = 0x70;
-    private static final byte TC_REFERENCE = 0x71;
-    private static final byte TC_CLASSDESC = 0x72;
-    private static final byte TC_OBJECT = 0x73;
-    private static final byte TC_STRING = 0x74;
-    private static final byte TC_ARRAY = 0x75;
-    private static final byte TC_CLASS = 0x76;
-    private static final byte TC_BLOCKDATA = 0x77;
-    private static final byte TC_ENDBLOCKDATA = 0x78;
-    private static final byte TC_BLOCKDATALONG = 0x7A;
-    private static final byte TC_LONGSTRING = 0x7C;
-    private static final byte TC_PROXYCLASSDESC = 0x7D;
-    private static final byte TC_ENUM = 0x7E;
-
-    // Class descriptor flags
-    private static final byte SC_WRITE_METHOD = 0x01;
-    private static final byte SC_SERIALIZABLE = 0x02;
-    private static final byte SC_EXTERNALIZABLE = 0x04;
-    private static final byte SC_BLOCK_DATA = 0x08;
-    private static final byte SC_ENUM = 0x10;
-
     // Block data buffer size (matches JDK's ObjectOutputStream)
     private static final int BLOCK_BUF_SIZE = 1024;
 
@@ -107,7 +81,10 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
     /** Next handle number to assign (0-based; wire handle = nextHandle + BASE_WIRE_HANDLE). */
     private int nextHandle;
 
-    // Block data buffering for ObjectOutput/DataOutput methods
+    // Shared buffer for both block-data mode (SerialOutput API) and raw structural writes.
+    // In block-data mode, draining prepends a TC_BLOCKDATA/TC_BLOCKDATALONG header.
+    // In raw mode, draining writes bytes directly with no header.
+    // The two modes never interleave: structural writes always enter after exitBlockDataMode().
     private final byte[] blockBuf = new byte[BLOCK_BUF_SIZE];
     private int blockPos;
     private boolean blockDataMode;
@@ -325,9 +302,21 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             throw new UTFDataFormatException("String too long for writeUTF: " + utfLen + " bytes");
         }
         writeShort((int) utfLen);
-        byte[] buf = new byte[(int) utfLen];
-        ModifiedUtf8.encode(s, buf, 0);
-        write(buf);
+        // encode character-by-character directly through the block-data buffer;
+        // no intermediate byte[] needed since write(int) already buffers into blockBuf
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c > 0 && c <= 0x7f) {
+                write(c);
+            } else if (c <= 0x7ff) {
+                write(0xc0 | 0x1f & c >> 6);
+                write(0x80 | 0x3f & c);
+            } else {
+                write(0xe0 | 0x0f & c >> 12);
+                write(0x80 | 0x3f & c >> 6);
+                write(0x80 | 0x3f & c);
+            }
+        }
     }
 
     // ---- Internal dispatch ----
@@ -402,9 +391,8 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             assignHandle(s);
             out.writeLong(utfLen);
         }
-        byte[] buf = new byte[(int) utfLen];
-        ModifiedUtf8.encode(str, buf, 0);
-        out.write(buf);
+        rawEncodeUtf(str);
+        rawFlush();
     }
 
     /**
@@ -418,9 +406,8 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
         }
         out.writeShort((int) utfLen);
         if (utfLen > 0) {
-            byte[] buf = new byte[(int) utfLen];
-            ModifiedUtf8.encode(s, buf, 0);
-            out.write(buf);
+            rawEncodeUtf(s);
+            rawFlush();
         }
     }
 
@@ -447,9 +434,53 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             typeStringHandles.put(typeString, h);
             out.writeLong(utfLen);
         }
-        byte[] buf = new byte[(int) utfLen];
-        ModifiedUtf8.encode(typeString, buf, 0);
-        out.write(buf);
+        rawEncodeUtf(typeString);
+        rawFlush();
+    }
+
+    /**
+     * Encode {@code s} in modified UTF-8 into {@code blockBuf} via {@link #rawWriteByte},
+     * draining to {@code out} with no block-data header whenever the buffer fills.
+     * Must only be called on the structural path (i.e. when {@code !blockDataMode}).
+     */
+    private void rawEncodeUtf(String s) throws IOException {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c > 0 && c <= 0x7f) {
+                rawWriteByte(c);
+            } else if (c <= 0x7ff) {
+                rawWriteByte(0xc0 | 0x1f & c >> 6);
+                rawWriteByte(0x80 | 0x3f & c);
+            } else {
+                rawWriteByte(0xe0 | 0x0f & c >> 12);
+                rawWriteByte(0x80 | 0x3f & c >> 6);
+                rawWriteByte(0x80 | 0x3f & c);
+            }
+        }
+    }
+
+    /**
+     * Buffer one byte for a raw (non-block-data) write, draining to {@code out} with no
+     * header when the buffer is full.
+     * Must only be called on the structural path (i.e. when {@code !blockDataMode}).
+     */
+    private void rawWriteByte(int b) throws IOException {
+        assert !blockDataMode;
+        if (blockPos >= BLOCK_BUF_SIZE) {
+            rawFlush();
+        }
+        blockBuf[blockPos++] = (byte) b;
+    }
+
+    /**
+     * Flush any bytes accumulated in {@code blockBuf} directly to {@code out}, with no
+     * block-data header. Resets {@code blockPos} to zero.
+     */
+    private void rawFlush() throws IOException {
+        if (blockPos > 0) {
+            out.write(blockBuf, 0, blockPos);
+            blockPos = 0;
+        }
     }
 
     // ---- Class descriptor writing ----
