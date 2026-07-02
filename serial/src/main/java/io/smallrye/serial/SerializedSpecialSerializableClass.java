@@ -17,13 +17,13 @@ public final class SerializedSpecialSerializableClass extends SerializedVersione
      * The serialized representation of {@link Enum java.lang.Enum}.
      */
     public static final SerializedSpecialSerializableClass ENUM = new SerializedSpecialSerializableClass(ConstantDescs.CD_Enum,
-            SerializedBuiltInClassLoader.forBootClassLoader(), 0L);
+            SerializedKnownClassLoader.forBootClassLoader(), 0L);
 
     /**
      * The serialized representation of {@link String java.lang.String}.
      */
     public static final SerializedSpecialSerializableClass STRING = new SerializedSpecialSerializableClass(
-            ConstantDescs.CD_String, SerializedBuiltInClassLoader.forBootClassLoader(), -6849794470754667710L);
+            ConstantDescs.CD_String, SerializedKnownClassLoader.forBootClassLoader(), -6849794470754667710L);
 
     /**
      * Construct a new instance.

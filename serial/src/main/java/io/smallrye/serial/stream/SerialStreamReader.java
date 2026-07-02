@@ -10,6 +10,7 @@ import java.io.StreamCorruptedException;
 import java.io.WriteAbortedException;
 import java.lang.constant.ClassDesc;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import io.smallrye.common.constraint.Assert;
@@ -17,7 +18,6 @@ import io.smallrye.serial.SerialData;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedArrayClass;
 import io.smallrye.serial.SerializedBooleanArray;
-import io.smallrye.serial.SerializedBuiltInClassLoader;
 import io.smallrye.serial.SerializedByteArray;
 import io.smallrye.serial.SerializedCharArray;
 import io.smallrye.serial.SerializedClass;
@@ -28,6 +28,7 @@ import io.smallrye.serial.SerializedExternalizable;
 import io.smallrye.serial.SerializedExternalizableClass;
 import io.smallrye.serial.SerializedFloatArray;
 import io.smallrye.serial.SerializedIntArray;
+import io.smallrye.serial.SerializedKnownClassLoader;
 import io.smallrye.serial.SerializedLongArray;
 import io.smallrye.serial.SerializedNull;
 import io.smallrye.serial.SerializedObjectArray;
@@ -256,8 +257,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             throw new InvalidObjectException("maximum stream depth exceeded: " + maxDepth);
         }
         try {
-            byte tc = in.readByte();
-            return readObject0(tc);
+            return readObject0(in.readByte());
         } finally {
             depth--;
         }
@@ -271,39 +271,30 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * @throws IOException on I/O or protocol errors
      */
     private Serialized readObject0(byte tc) throws IOException {
-        if (tc == TC_NULL) {
-            return SerializedNull.INSTANCE;
-        } else if (tc == TC_REFERENCE) {
-            return readReference();
-        } else if (tc == TC_STRING) {
-            return readString();
-        } else if (tc == TC_LONGSTRING) {
-            return readLongString();
-        } else if (tc == TC_OBJECT) {
-            return readTcObject();
-        } else if (tc == TC_ARRAY) {
-            return readArray();
-        } else if (tc == TC_ENUM) {
-            return readEnum();
-        } else if (tc == TC_CLASS) {
-            return readClassValue();
-        } else if (tc == TC_CLASSDESC || tc == TC_PROXYCLASSDESC) {
-            return readClassDesc(tc);
-        } else if (tc == TC_RESET) {
-            handles.clear();
-            return readObject0();
-        } else if (tc == TC_EXCEPTION) {
-            handles.clear();
-            readObject0();
-            throw new WriteAbortedException("writing aborted", new IOException("TC_EXCEPTION in stream"));
-        } else if (tc == TC_BLOCKDATA || tc == TC_BLOCKDATALONG) {
-            throw new StreamCorruptedException(
+        return switch (tc) {
+            case TC_NULL -> SerializedNull.INSTANCE;
+            case TC_REFERENCE -> readReference();
+            case TC_STRING -> readString();
+            case TC_LONGSTRING -> readLongString();
+            case TC_OBJECT -> readTcObject();
+            case TC_ARRAY -> readArray();
+            case TC_ENUM -> readEnum();
+            case TC_CLASS -> readClassValue();
+            case TC_CLASSDESC, TC_PROXYCLASSDESC -> readClassDesc(tc);
+            case TC_RESET -> {
+                handles.clear();
+                yield readObject0();
+            }
+            case TC_EXCEPTION -> {
+                handles.clear();
+                readObject0();
+                throw new WriteAbortedException("writing aborted", new IOException("TC_EXCEPTION in stream"));
+            }
+            case TC_BLOCKDATA, TC_BLOCKDATALONG -> throw new StreamCorruptedException(
                     "unexpected block data (TC 0x" + Integer.toHexString(tc & 0xFF) + ")");
-        } else if (tc == TC_ENDBLOCKDATA) {
-            throw new StreamCorruptedException("unexpected end of block data");
-        } else {
-            throw new StreamCorruptedException("invalid type code: 0x" + Integer.toHexString(tc & 0xFF));
-        }
+            case TC_ENDBLOCKDATA -> throw new StreamCorruptedException("unexpected end of block data");
+            default -> throw new StreamCorruptedException("invalid type code: 0x" + Integer.toHexString(tc & 0xFF));
+        };
     }
 
     // ---- Handle management ----
@@ -342,8 +333,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      */
     private SerializedString readString() throws IOException {
         int utfLen = in.readUnsignedShort();
-        byte[] buf = readNBytes(utfLen);
-        SerializedString s = new SerializedString(ModifiedUtf8.decode(buf, 0, utfLen));
+        SerializedString s = new SerializedString(ModifiedUtf8.decode(readNBytes(utfLen), 0, utfLen));
         assignHandle(s);
         return s;
     }
@@ -372,8 +362,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      */
     private String readRawUTF() throws IOException {
         int utfLen = in.readUnsignedShort();
-        byte[] buf = readNBytes(utfLen);
-        return ModifiedUtf8.decode(buf, 0, utfLen);
+        return ModifiedUtf8.decode(readNBytes(utfLen), 0, utfLen);
     }
 
     /**
@@ -384,19 +373,15 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      */
     private Serialized readStringOrReference() throws IOException {
         byte tc = in.readByte();
-        if (tc == TC_STRING) {
-            return readString();
-        } else if (tc == TC_LONGSTRING) {
-            return readLongString();
-        } else if (tc == TC_REFERENCE) {
-            return readReference();
-        } else if (tc == TC_NULL) {
-            return SerializedNull.INSTANCE;
-        } else {
-            throw new StreamCorruptedException(
+        return switch (tc) {
+            case TC_STRING -> readString();
+            case TC_LONGSTRING -> readLongString();
+            case TC_REFERENCE -> readReference();
+            case TC_NULL -> SerializedNull.INSTANCE;
+            default -> throw new StreamCorruptedException(
                     "expected TC_STRING, TC_LONGSTRING, TC_REFERENCE, or TC_NULL, got: 0x"
                             + Integer.toHexString(tc & 0xFF));
-        }
+        };
     }
 
     // ---- Class descriptor reading ----
@@ -409,18 +394,14 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      */
     private Serialized readClassDescOrRef() throws IOException {
         byte tc = in.readByte();
-        if (tc == TC_CLASSDESC) {
-            return readNormalClassDesc();
-        } else if (tc == TC_PROXYCLASSDESC) {
-            return readProxyClassDesc();
-        } else if (tc == TC_REFERENCE) {
-            return readReference();
-        } else if (tc == TC_NULL) {
-            return SerializedNull.INSTANCE;
-        } else {
-            throw new StreamCorruptedException(
+        return switch (tc) {
+            case TC_CLASSDESC -> readNormalClassDesc();
+            case TC_PROXYCLASSDESC -> readProxyClassDesc();
+            case TC_REFERENCE -> readReference();
+            case TC_NULL -> SerializedNull.INSTANCE;
+            default -> throw new StreamCorruptedException(
                     "expected class descriptor, got: 0x" + Integer.toHexString(tc & 0xFF));
-        }
+        };
     }
 
     /**
@@ -430,14 +411,12 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * @return the class descriptor node (not {@code null})
      */
     private Serialized readClassDesc(byte tc) throws IOException {
-        if (tc == TC_CLASSDESC) {
-            return readNormalClassDesc();
-        } else if (tc == TC_PROXYCLASSDESC) {
-            return readProxyClassDesc();
-        } else {
-            throw new StreamCorruptedException(
+        return switch (tc) {
+            case TC_CLASSDESC -> readNormalClassDesc();
+            case TC_PROXYCLASSDESC -> readProxyClassDesc();
+            default -> throw new StreamCorruptedException(
                     "expected TC_CLASSDESC or TC_PROXYCLASSDESC, got: 0x" + Integer.toHexString(tc & 0xFF));
-        }
+        };
     }
 
     /**
@@ -513,10 +492,10 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         ClassDesc cd = Util.classDescOfName(name);
 
         if (isEnum) {
-            return new SerializedEnumClass(cd, SerializedBuiltInClassLoader.forBootClassLoader(), uid);
+            return new SerializedEnumClass(cd, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid);
         } else if (isExternalizable) {
             SerializedClass extSuper = superDesc instanceof SerializedClass sc ? sc : null;
-            return new SerializedExternalizableClass(cd, SerializedBuiltInClassLoader.forBootClassLoader(), uid, extSuper);
+            return new SerializedExternalizableClass(cd, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid, extSuper);
         } else if (isSerializable) {
             if (name.startsWith("[")) {
                 // array class descriptor
@@ -525,7 +504,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             // serializable class (also covers records at the wire level)
             SerializedSerializableClass.Builder builder = SerializedSerializableClass.builder()
                     .classDesc(cd)
-                    .classLoader(SerializedBuiltInClassLoader.forBootClassLoader())
+                    .classLoader(SerializedKnownClassLoader.forUnspecifiedClassLoader())
                     .uid(uid)
                     .hasWriteMethod((flags & SC_WRITE_METHOD) != 0);
             for (FieldDesc fd : fields) {
@@ -550,7 +529,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      */
     private SerializedArrayClass buildArrayClassDesc(ClassDesc arrayDesc, long uid) throws IOException {
         ClassDesc componentDesc = arrayDesc.componentType();
-        return new SerializedArrayClass(arrayDesc, SerializedBuiltInClassLoader.forBootClassLoader(), uid,
+        return new SerializedArrayClass(arrayDesc, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid,
                 buildComponentTypeDesc(componentDesc));
     }
 
@@ -569,13 +548,13 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             return SerializedPrimitiveClass.of(componentDesc);
         }
         if (componentDesc.isArray()) {
-            return new SerializedArrayClass(componentDesc, SerializedBuiltInClassLoader.forBootClassLoader(), 0,
+            return new SerializedArrayClass(componentDesc, SerializedKnownClassLoader.forUnspecifiedClassLoader(), 0,
                     buildComponentTypeDesc(componentDesc.componentType()));
         }
         // object: create a minimal placeholder
         return SerializedSerializableClass.builder()
                 .classDesc(componentDesc)
-                .classLoader(SerializedBuiltInClassLoader.forBootClassLoader())
+                .classLoader(SerializedKnownClassLoader.forUnspecifiedClassLoader())
                 .uid(0)
                 .build();
     }
@@ -603,7 +582,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         SerializedClass proxySuperClass = rawSuperDesc instanceof SerializedClass sc ? sc : null;
 
         SerializedProxyClass proxyClass = new SerializedProxyClass(ifaceNames,
-                SerializedBuiltInClassLoader.forBootClassLoader(), proxySuperClass);
+                SerializedKnownClassLoader.forUnspecifiedClassLoader(), proxySuperClass);
         handles.set(handleIndex, proxyClass);
         return proxyClass;
     }
@@ -662,17 +641,19 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         // read remaining TCs until TC_ENDBLOCKDATA
         for (;;) {
             byte tc = in.readByte();
-            if (tc == TC_ENDBLOCKDATA) {
-                return;
-            }
-            if (tc == TC_BLOCKDATA) {
-                int len = in.readUnsignedByte();
-                skipNBytes(len);
-            } else if (tc == TC_BLOCKDATALONG) {
-                int len = in.readInt();
-                skipNBytes(len);
-            } else {
-                readObject0(tc);
+            switch (tc) {
+                case TC_ENDBLOCKDATA -> {
+                    return;
+                }
+                case TC_BLOCKDATA -> {
+                    int len = in.readUnsignedByte();
+                    skipNBytes(len);
+                }
+                case TC_BLOCKDATALONG -> {
+                    int len = in.readInt();
+                    skipNBytes(len);
+                }
+                default -> readObject0(tc);
             }
         }
     }
@@ -794,10 +775,8 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * @return the deserialized proxy object node (not {@code null})
      */
     private Serialized readProxyObject(SerializedProxyClass proxyClass) throws IOException {
-        return new SerializedProxyObject(proxyClass, this::assignHandle, () -> {
-            // proxy data: Proxy super's one object field (invocation handler)
-            return readObject0();
-        });
+        // proxy data: Proxy super's one object field (invocation handler)
+        return new SerializedProxyObject(proxyClass, this::assignHandle, this::readObject0);
     }
 
     // ---- Enum reading ----
@@ -839,26 +818,18 @@ public final class SerialStreamReader implements SerialInput, Closeable {
 
         char componentCode = arrayClass.classDesc().componentType().descriptorString().charAt(0);
 
-        Serialized result;
-        if (componentCode == 'Z') {
-            result = readBooleanArray(arrayClass, length);
-        } else if (componentCode == 'B') {
-            result = readByteArray(arrayClass, length);
-        } else if (componentCode == 'C') {
-            result = readCharArray(arrayClass, length);
-        } else if (componentCode == 'S') {
-            result = readShortArray(arrayClass, length);
-        } else if (componentCode == 'I') {
-            result = readIntArray(arrayClass, length);
-        } else if (componentCode == 'J') {
-            result = readLongArray(arrayClass, length);
-        } else if (componentCode == 'F') {
-            result = readFloatArray(arrayClass, length);
-        } else if (componentCode == 'D') {
-            result = readDoubleArray(arrayClass, length);
-        } else {
-            result = readObjectArray(arrayClass, length);
-        }
+        Serialized result = switch (componentCode) {
+            case 'Z' -> readBooleanArray(arrayClass, length);
+            case 'B' -> readByteArray(arrayClass, length);
+            case 'C' -> readCharArray(arrayClass, length);
+            case 'S' -> readShortArray(arrayClass, length);
+            case 'I' -> readIntArray(arrayClass, length);
+            case 'J' -> readLongArray(arrayClass, length);
+            case 'F' -> readFloatArray(arrayClass, length);
+            case 'D' -> readDoubleArray(arrayClass, length);
+            case 'L', '[' -> readObjectArray(arrayClass, length);
+            default -> throw new IllegalStateException("Unexpected array component code: " + componentCode);
+        };
         handles.set(handleIndex, result);
         return result;
     }
@@ -1035,16 +1006,17 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         // skip block data segments until we find an object or end marker
         for (;;) {
             byte tc = in.readByte();
-            if (tc == TC_BLOCKDATA) {
-                skipNBytes(in.readUnsignedByte());
-            } else if (tc == TC_BLOCKDATALONG) {
-                skipNBytes(in.readInt());
-            } else if (tc == TC_ENDBLOCKDATA) {
-                endOfBlockData = true;
-                blockDataMode = false;
-                return null;
-            } else {
-                return readObject0(tc);
+            switch (tc) {
+                case TC_BLOCKDATA -> skipNBytes(in.readUnsignedByte());
+                case TC_BLOCKDATALONG -> skipNBytes(in.readInt());
+                case TC_ENDBLOCKDATA -> {
+                    endOfBlockData = true;
+                    blockDataMode = false;
+                    return null;
+                }
+                default -> {
+                    return readObject0(tc);
+                }
             }
         }
     }
@@ -1390,22 +1362,27 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             return false;
         }
         byte tc = in.readByte();
-        if (tc == TC_BLOCKDATA) {
-            blockDataRemaining = in.readUnsignedByte();
-            return true;
-        } else if (tc == TC_BLOCKDATALONG) {
-            blockDataRemaining = in.readInt();
-            if (blockDataRemaining < 0) {
-                throw new StreamCorruptedException("negative block data length");
+        switch (tc) {
+            case TC_BLOCKDATA -> {
+                blockDataRemaining = in.readUnsignedByte();
+                return true;
             }
-            return true;
-        } else if (tc == TC_ENDBLOCKDATA) {
-            endOfBlockData = true;
-            blockDataMode = false;
-            return false;
-        } else {
-            peekTC = tc;
-            return false;
+            case TC_BLOCKDATALONG -> {
+                blockDataRemaining = in.readInt();
+                if (blockDataRemaining < 0) {
+                    throw new StreamCorruptedException("negative block data length");
+                }
+                return true;
+            }
+            case TC_ENDBLOCKDATA -> {
+                endOfBlockData = true;
+                blockDataMode = false;
+                return false;
+            }
+            default -> {
+                peekTC = tc;
+                return false;
+            }
         }
     }
 
@@ -1427,44 +1404,48 @@ public final class SerialStreamReader implements SerialInput, Closeable {
 
         for (;;) {
             byte tc = in.readByte();
-            if (tc == TC_ENDBLOCKDATA) {
-                if (byteBuf != null) {
-                    result.add(StreamData.of(byteBuf));
+            switch (tc) {
+                case TC_ENDBLOCKDATA -> {
+                    if (byteBuf != null) {
+                        result.add(StreamData.of(byteBuf));
+                    }
+                    if (objBuf != null) {
+                        result.add(StreamData.of(objBuf));
+                    }
+                    return result;
                 }
-                if (objBuf != null) {
-                    result.add(StreamData.of(objBuf));
+                case TC_BLOCKDATA -> {
+                    if (objBuf != null) {
+                        result.add(StreamData.of(objBuf));
+                        objBuf = null;
+                    }
+                    int len = in.readUnsignedByte();
+                    byte[] block = readNBytes(len);
+                    byteBuf = appendBytes(byteBuf, block);
                 }
-                return result;
-            }
-            if (tc == TC_BLOCKDATA) {
-                if (objBuf != null) {
-                    result.add(StreamData.of(objBuf));
-                    objBuf = null;
+                case TC_BLOCKDATALONG -> {
+                    if (objBuf != null) {
+                        result.add(StreamData.of(objBuf));
+                        objBuf = null;
+                    }
+                    int len = in.readInt();
+                    if (len < 0) {
+                        throw new StreamCorruptedException("negative block data length");
+                    }
+                    byte[] block = readNBytes(len);
+                    byteBuf = appendBytes(byteBuf, block);
                 }
-                int len = in.readUnsignedByte();
-                byte[] block = readNBytes(len);
-                byteBuf = appendBytes(byteBuf, block);
-            } else if (tc == TC_BLOCKDATALONG) {
-                if (objBuf != null) {
-                    result.add(StreamData.of(objBuf));
-                    objBuf = null;
+                default -> {
+                    if (byteBuf != null) {
+                        result.add(StreamData.of(byteBuf));
+                        byteBuf = null;
+                    }
+                    Serialized obj = readObject0(tc);
+                    if (objBuf == null) {
+                        objBuf = new ArrayList<>();
+                    }
+                    objBuf.add(obj);
                 }
-                int len = in.readInt();
-                if (len < 0) {
-                    throw new StreamCorruptedException("negative block data length");
-                }
-                byte[] block = readNBytes(len);
-                byteBuf = appendBytes(byteBuf, block);
-            } else {
-                if (byteBuf != null) {
-                    result.add(StreamData.of(byteBuf));
-                    byteBuf = null;
-                }
-                Serialized obj = readObject0(tc);
-                if (objBuf == null) {
-                    objBuf = new ArrayList<>();
-                }
-                objBuf.add(obj);
             }
         }
     }
@@ -1480,8 +1461,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         if (existing == null) {
             return block;
         }
-        byte[] combined = new byte[existing.length + block.length];
-        System.arraycopy(existing, 0, combined, 0, existing.length);
+        byte[] combined = Arrays.copyOf(existing, existing.length + block.length);
         System.arraycopy(block, 0, combined, existing.length, block.length);
         return combined;
     }

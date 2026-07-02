@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import io.smallrye.serial.SerialContext;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedBooleanArray;
-import io.smallrye.serial.SerializedBuiltInClassLoader;
 import io.smallrye.serial.SerializedByteArray;
 import io.smallrye.serial.SerializedCharArray;
 import io.smallrye.serial.SerializedDoubleArray;
@@ -28,6 +27,7 @@ import io.smallrye.serial.SerializedEnum;
 import io.smallrye.serial.SerializedExternalizable;
 import io.smallrye.serial.SerializedFloatArray;
 import io.smallrye.serial.SerializedIntArray;
+import io.smallrye.serial.SerializedKnownClassLoader;
 import io.smallrye.serial.SerializedLongArray;
 import io.smallrye.serial.SerializedNull;
 import io.smallrye.serial.SerializedObjectArray;
@@ -50,10 +50,11 @@ class SerialStreamRoundTripTest {
 
     private final SerialContext ctx = SerialContext.builder()
             .addDefaultProviders()
-            // resolve built-in class loaders to the test class loader
+            // resolve unspecified class loaders to the test class loader
             .addDeserializer(new ObjectDeserializer() {
                 public Object deserialize(Context ctxt, Serialized serialized) throws IOException, ClassNotFoundException {
-                    if (serialized instanceof SerializedBuiltInClassLoader) {
+                    if (serialized instanceof SerializedKnownClassLoader kcl
+                            && kcl.kind() == SerializedKnownClassLoader.Kind.UNSPECIFIED) {
                         return SerialStreamRoundTripTest.class.getClassLoader();
                     }
                     return ctxt.next();

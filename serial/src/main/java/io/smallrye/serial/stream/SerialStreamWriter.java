@@ -25,6 +25,7 @@ import io.smallrye.serial.SerializedExternalizableClass;
 import io.smallrye.serial.SerializedFieldedClass;
 import io.smallrye.serial.SerializedFloatArray;
 import io.smallrye.serial.SerializedIntArray;
+import io.smallrye.serial.SerializedKnownClassLoader;
 import io.smallrye.serial.SerializedLongArray;
 import io.smallrye.serial.SerializedNull;
 import io.smallrye.serial.SerializedObjectArray;
@@ -921,7 +922,7 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
     private SerializedEnumClass getEnumSuperDesc() {
         SerializedEnumClass desc = enumSuperDesc;
         if (desc == null) {
-            desc = new SerializedEnumClass(ConstantDescs.CD_Enum, SerializedNull.INSTANCE, 0L);
+            desc = new SerializedEnumClass(ConstantDescs.CD_Enum, SerializedKnownClassLoader.forBootClassLoader(), 0L);
             enumSuperDesc = desc;
         }
         return desc;

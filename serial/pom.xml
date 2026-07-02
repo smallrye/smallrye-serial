@@ -18,6 +18,10 @@
             <artifactId>smallrye-common-constraint</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.smallrye.classfile</groupId>
+            <artifactId>jdk-classfile-backport</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <scope>test</scope>

@@ -30,8 +30,7 @@ public final class ProxyDeserializer implements ObjectDeserializer {
                 interfaces[i] = Class.forName(interfaceNames.get(i), false, cl);
             }
             InvocationHandler handler = ctxt.deserialize(spo.invocationHandler(), InvocationHandler.class);
-            Object proxy = Proxy.newProxyInstance(cl, interfaces, handler);
-            return proxy;
+            return Proxy.newProxyInstance(cl, interfaces, handler);
         } else {
             return ctxt.next();
         }

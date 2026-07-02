@@ -35,13 +35,15 @@ class PrinterTest {
     }
 
     @Test
-    void printBuiltInClassLoaders() {
+    void printKnownClassLoaders() {
         assertEquals("boot class loader",
-                Printer.print(SerializedBuiltInClassLoader.forBootClassLoader()));
+                Printer.print(SerializedKnownClassLoader.forBootClassLoader()));
         assertEquals("platform class loader",
-                Printer.print(SerializedBuiltInClassLoader.forPlatformClassLoader()));
+                Printer.print(SerializedKnownClassLoader.forPlatformClassLoader()));
         assertEquals("app class loader",
-                Printer.print(SerializedBuiltInClassLoader.forAppClassLoader()));
+                Printer.print(SerializedKnownClassLoader.forAppClassLoader()));
+        assertEquals("unspecified class loader",
+                Printer.print(SerializedKnownClassLoader.forUnspecifiedClassLoader()));
     }
 
     @Test
@@ -65,7 +67,7 @@ class PrinterTest {
     void printSerializableClassWithFields() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Point")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(1L)
                 .addField("x", int.class)
                 .addField("y", int.class)
@@ -83,14 +85,14 @@ class PrinterTest {
     void printSerializableClassWithSuperClass() {
         SerializedSerializableClass superClass = SerializedSerializableClass.builder()
                 .name("com.example.Base")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(1L)
                 .addField("id", int.class)
                 .build();
 
         SerializedSerializableClass subClass = SerializedSerializableClass.builder()
                 .name("com.example.Sub")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(2L)
                 .superClass(superClass)
                 .addField("name", String.class)
@@ -108,7 +110,7 @@ class PrinterTest {
     void printSerializableWithPrimitiveFields() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Pair")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(1L)
                 .addField("x", int.class)
                 .addField("y", int.class)
@@ -143,7 +145,7 @@ class PrinterTest {
     void printSerializableWithObjectField() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Named")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(1L)
                 .addField("name", String.class)
                 .build();
@@ -172,7 +174,7 @@ class PrinterTest {
     void printIntArray() {
         SerializedArrayClass arrayClass = new SerializedArrayClass(
                 ClassDesc.ofDescriptor("[I"),
-                SerializedBuiltInClassLoader.forBootClassLoader(),
+                SerializedKnownClassLoader.forBootClassLoader(),
                 0L,
                 SerializedPrimitiveClass.INT);
 
@@ -188,7 +190,7 @@ class PrinterTest {
     void printEmptyIntArray() {
         SerializedArrayClass arrayClass = new SerializedArrayClass(
                 ClassDesc.ofDescriptor("[I"),
-                SerializedBuiltInClassLoader.forBootClassLoader(),
+                SerializedKnownClassLoader.forBootClassLoader(),
                 0L,
                 SerializedPrimitiveClass.INT);
 
@@ -201,7 +203,7 @@ class PrinterTest {
     void printByteArrayHexDump() {
         SerializedArrayClass arrayClass = new SerializedArrayClass(
                 ClassDesc.ofDescriptor("[B"),
-                SerializedBuiltInClassLoader.forBootClassLoader(),
+                SerializedKnownClassLoader.forBootClassLoader(),
                 0L,
                 SerializedPrimitiveClass.BYTE);
 
@@ -218,7 +220,7 @@ class PrinterTest {
     void printCharArrayHexDump() {
         SerializedArrayClass arrayClass = new SerializedArrayClass(
                 ClassDesc.ofDescriptor("[C"),
-                SerializedBuiltInClassLoader.forBootClassLoader(),
+                SerializedKnownClassLoader.forBootClassLoader(),
                 0L,
                 SerializedPrimitiveClass.CHAR);
 
@@ -245,7 +247,7 @@ class PrinterTest {
     void printCircularReference() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Node")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(1L)
                 .addField("next", ClassDesc.of("com.example.Node"))
                 .build();
@@ -270,7 +272,7 @@ class PrinterTest {
     void printSharedClassDescriptor() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Item")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(1L)
                 .addField("value", int.class)
                 .build();
@@ -295,7 +297,7 @@ class PrinterTest {
     void builderCustomIndent() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Foo")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(0L)
                 .build();
 
@@ -309,7 +311,7 @@ class PrinterTest {
     void builderHideClassLoader() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Foo")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(0L)
                 .build();
 
@@ -322,7 +324,7 @@ class PrinterTest {
     void builderMaxDepth() {
         SerializedSerializableClass sc = SerializedSerializableClass.builder()
                 .name("com.example.Foo")
-                .classLoader(SerializedBuiltInClassLoader.forAppClassLoader())
+                .classLoader(SerializedKnownClassLoader.forAppClassLoader())
                 .uid(0L)
                 .addField("value", int.class)
                 .build();

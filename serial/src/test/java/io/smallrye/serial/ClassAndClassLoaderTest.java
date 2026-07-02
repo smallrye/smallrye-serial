@@ -70,7 +70,7 @@ class ClassAndClassLoaderTest {
     void appClassLoaderRoundTrip() throws IOException, ClassNotFoundException {
         ClassLoader appCl = ClassLoader.getSystemClassLoader();
         Serialized serialized = ctx.serialize(appCl);
-        assertInstanceOf(SerializedBuiltInClassLoader.class, serialized);
+        assertInstanceOf(SerializedKnownClassLoader.class, serialized);
         assertSame(appCl, ctx.deserialize(serialized));
     }
 
@@ -78,7 +78,7 @@ class ClassAndClassLoaderTest {
     void platformClassLoaderRoundTrip() throws IOException, ClassNotFoundException {
         ClassLoader platformCl = ClassLoader.getPlatformClassLoader();
         Serialized serialized = ctx.serialize(platformCl);
-        assertInstanceOf(SerializedBuiltInClassLoader.class, serialized);
+        assertInstanceOf(SerializedKnownClassLoader.class, serialized);
         assertSame(platformCl, ctx.deserialize(serialized));
     }
 
@@ -88,7 +88,7 @@ class ClassAndClassLoaderTest {
         Serialized serialized = ctx.serialize(String.class);
         assertInstanceOf(SerializedSpecialSerializableClass.class, serialized);
         SerializedClass sc = (SerializedClass) serialized;
-        assertSame(SerializedBuiltInClassLoader.forBootClassLoader(), sc.classLoader());
+        assertSame(SerializedKnownClassLoader.forBootClassLoader(), sc.classLoader());
         assertSame(String.class, ctx.deserialize(serialized));
     }
 

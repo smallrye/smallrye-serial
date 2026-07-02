@@ -19,10 +19,8 @@ public final class ReadResolveDeserializer implements ObjectDeserializer {
 
     public Object deserialize(final Context ctxt, final Serialized serialized) throws IOException, ClassNotFoundException {
         Object deserialized = ctxt.next();
-        if (deserialized != null) {
-            if (ReadUtil.hasReadResolve(deserialized.getClass())) {
-                deserialized = ReadUtil.readResolve(deserialized);
-            }
+        if (deserialized != null && ReadUtil.hasReadResolve(deserialized.getClass())) {
+            deserialized = ReadUtil.readResolve(deserialized);
         }
         return deserialized;
     }

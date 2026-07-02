@@ -26,6 +26,7 @@
         <maven.compiler.release>17</maven.compiler.release>
 
         <version.smallrye-common>2.19.0</version.smallrye-common>
+        <version.jdk-classfile-backport>27</version.jdk-classfile-backport>
     </properties>
 
     <licenses>
@@ -58,6 +59,11 @@
                 <groupId>io.smallrye.common</groupId>
                 <artifactId>smallrye-common-constraint</artifactId>
                 <version>${version.smallrye-common}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.smallrye.classfile</groupId>
+                <artifactId>jdk-classfile-backport</artifactId>
+                <version>${version.jdk-classfile-backport}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -40,7 +40,7 @@ public final class SerializedPrimitiveClass extends SerializedClass {
     public static final SerializedPrimitiveClass VOID = new SerializedPrimitiveClass(ClassDesc.ofDescriptor("V"));
 
     private SerializedPrimitiveClass(final ClassDesc classDesc) {
-        super(classDesc, SerializedNull.INSTANCE);
+        super(classDesc, SerializedKnownClassLoader.forBootClassLoader());
     }
 
     /**

@@ -18,10 +18,10 @@ import java.util.List;
 import io.smallrye.serial.SerialField;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedArrayClass;
-import io.smallrye.serial.SerializedBuiltInClassLoader;
 import io.smallrye.serial.SerializedClass;
 import io.smallrye.serial.SerializedEnumClass;
 import io.smallrye.serial.SerializedExternalizableClass;
+import io.smallrye.serial.SerializedKnownClassLoader;
 import io.smallrye.serial.SerializedNonSerializableClass;
 import io.smallrye.serial.SerializedPrimitiveClass;
 import io.smallrye.serial.SerializedRecordClass;
@@ -59,7 +59,7 @@ public final class ClassSerializer implements ObjectSerializer {
 
             ClassLoader cl = clazz.getClassLoader();
             Serialized classLoader = cl == null
-                    ? SerializedBuiltInClassLoader.forBootClassLoader()
+                    ? SerializedKnownClassLoader.forBootClassLoader()
                     : ctxt.serialize(cl);
 
             if (clazz.isArray()) {

@@ -3,7 +3,6 @@ package io.smallrye.serial.impl.providers;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedClass;
@@ -27,9 +26,7 @@ public final class ProxySerializer implements ObjectSerializer {
     public Serialized serialize(final Context ctxt, final Object object) throws IOException {
         if (Proxy.isProxyClass(object.getClass())) {
             Class<?>[] interfaces = object.getClass().getInterfaces();
-            var interfaceNames = Arrays.stream(interfaces)
-                    .map(Class::getName)
-                    .collect(Collectors.toUnmodifiableList());
+            var interfaceNames = Arrays.stream(interfaces).map(Class::getName).toList();
             Serialized classLoader = ctxt.serialize(object.getClass().getClassLoader());
             SerializedClass superClass = (SerializedClass) ctxt.serialize(Proxy.class);
             SerializedProxyClass proxyClass = new SerializedProxyClass(interfaceNames, classLoader, superClass);

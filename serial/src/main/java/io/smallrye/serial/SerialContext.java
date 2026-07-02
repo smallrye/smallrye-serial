@@ -14,14 +14,14 @@ import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.ClassLocal;
 import io.smallrye.serial.impl.providers.ArrayDeserializer;
 import io.smallrye.serial.impl.providers.ArraySerializer;
-import io.smallrye.serial.impl.providers.BuiltInClassLoaderDeserializer;
-import io.smallrye.serial.impl.providers.BuiltInClassLoaderSerializer;
 import io.smallrye.serial.impl.providers.ClassDeserializer;
 import io.smallrye.serial.impl.providers.ClassSerializer;
 import io.smallrye.serial.impl.providers.EnumDeserializer;
 import io.smallrye.serial.impl.providers.EnumSerializer;
 import io.smallrye.serial.impl.providers.ExternalizableDeserializer;
 import io.smallrye.serial.impl.providers.ExternalizableSerializer;
+import io.smallrye.serial.impl.providers.KnownClassLoaderDeserializer;
+import io.smallrye.serial.impl.providers.KnownClassLoaderSerializer;
 import io.smallrye.serial.impl.providers.ProxyDeserializer;
 import io.smallrye.serial.impl.providers.ProxySerializer;
 import io.smallrye.serial.impl.providers.ReadResolveDeserializer;
@@ -160,6 +160,18 @@ public final class SerialContext implements Serializer, Deserializer {
         public boolean hasDeserialized(final Serialized serialized) {
             return SerialContext.this.hasDeserialized(serialized);
         }
+
+        /**
+         * Compute and cache a per-class value for the lifetime of the enclosing context.
+         *
+         * @param local the class local key (must not be {@code null})
+         * @param type the class to compute data for (must not be {@code null})
+         * @param <T> the type of the cached value
+         * @return the computed or cached value
+         */
+        public <T> T classLocal(ClassLocal<T> local, Class<?> type) {
+            return SerialContext.this.classLocal(local, type);
+        }
     }
 
     /**
@@ -236,7 +248,7 @@ public final class SerialContext implements Serializer, Deserializer {
         public Builder addDefaultProviders() {
             serializers.add(new WriteReplaceSerializer());
             serializers.add(new ClassSerializer());
-            serializers.add(new BuiltInClassLoaderSerializer());
+            serializers.add(new KnownClassLoaderSerializer());
             serializers.add(new EnumSerializer());
             serializers.add(new StringSerializer());
             serializers.add(new ProxySerializer());
@@ -247,7 +259,7 @@ public final class SerialContext implements Serializer, Deserializer {
 
             deserializers.add(new ReadResolveDeserializer());
             deserializers.add(new ClassDeserializer());
-            deserializers.add(new BuiltInClassLoaderDeserializer());
+            deserializers.add(new KnownClassLoaderDeserializer());
             deserializers.add(new EnumDeserializer());
             deserializers.add(new StringDeserializer());
             deserializers.add(new ProxyDeserializer());

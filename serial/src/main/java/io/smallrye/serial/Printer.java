@@ -325,8 +325,8 @@ public final class Printer {
                 sb.append("null");
             } else if (value instanceof SerializedString ss) {
                 printString(ss);
-            } else if (value instanceof SerializedBuiltInClassLoader cl) {
-                printBuiltInClassLoader(cl);
+            } else if (value instanceof SerializedKnownClassLoader cl) {
+                printKnownClassLoader(cl);
             } else if (value instanceof SerializedPrimitiveClass pc) {
                 sb.append(pc.name());
 
@@ -396,13 +396,14 @@ public final class Printer {
         }
 
         /**
-         * Print a built-in class loader by its kind name.
+         * Print a known class loader by its kind name.
          */
-        private void printBuiltInClassLoader(final SerializedBuiltInClassLoader cl) {
+        private void printKnownClassLoader(final SerializedKnownClassLoader cl) {
             sb.append(switch (cl.kind()) {
                 case BOOT -> "boot class loader";
                 case PLATFORM -> "platform class loader";
                 case APP -> "app class loader";
+                case UNSPECIFIED -> "unspecified class loader";
             });
         }
 

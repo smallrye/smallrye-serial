@@ -1,6 +1,7 @@
 
 module io.smallrye.serial {
     requires io.smallrye.common.constraint;
+    requires io.smallrye.classfile;
     requires jdk.unsupported;
 
     exports io.smallrye.serial;
