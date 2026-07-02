@@ -79,7 +79,12 @@ public final class ClassSerializer implements ObjectSerializer {
             }
 
             if (Externalizable.class.isAssignableFrom(clazz)) {
-                return new SerializedExternalizableClass(cd, classLoader, uid);
+                SerializedClass superClass = null;
+                Class<?> sup = clazz.getSuperclass();
+                if (sup != null && Serializable.class.isAssignableFrom(sup)) {
+                    superClass = (SerializedClass) ctxt.serialize(sup);
+                }
+                return new SerializedExternalizableClass(cd, classLoader, uid, superClass);
             }
 
             if (clazz.isRecord()) {

@@ -674,6 +674,119 @@ class SerialStreamRoundTripTest {
         }
     }
 
+    // ======== ObjectInput round-trip via class annotation callbacks ========
+
+    @Test
+    void objectInputRoundTripViaAnnotation() throws Exception {
+        // write a SimplePoint with a ClassAnnotationWriter that emits
+        // primitives + a string + an object as annotation data for each class desc
+        SimplePoint original = new SimplePoint(42, -7);
+        Serialized graph = ctx.serialize(original);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (SerialStreamWriter writer = SerialStreamWriter.builder(baos)
+                .classAnnotationWriter((classDesc, w) -> {
+                    w.writeInt(0xCAFE);
+                    w.writeBoolean(true);
+                    w.writeLong(123456789L);
+                    w.writeDouble(3.14);
+                    w.writeUTF("annotation-data");
+                    w.writeSerialized(new SerializedString("embedded-object"));
+                    w.writeShort(0x1234);
+                })
+                .build()) {
+            writer.writeSerialized(graph);
+        }
+        byte[] bytes = baos.toByteArray();
+
+        // read back, using a ClassAnnotationReader that reads the same values
+        // via ObjectInput methods and verifies them
+        int[] callCount = { 0 };
+        try (SerialStreamReader reader = SerialStreamReader.builder(new ByteArrayInputStream(bytes))
+                .classAnnotationReader(r -> {
+                    assertEquals(0xCAFE, r.readInt());
+                    assertTrue(r.readBoolean());
+                    assertEquals(123456789L, r.readLong());
+                    assertEquals(3.14, r.readDouble(), 0.0);
+                    assertEquals("annotation-data", r.readUTF());
+                    Serialized obj = r.readSerialized();
+                    assertInstanceOf(SerializedString.class, obj);
+                    assertEquals("embedded-object", ((SerializedString) obj).string());
+                    assertEquals(0x1234, r.readShort());
+                    callCount[0]++;
+                    return null;
+                })
+                .build()) {
+            Serialized result = reader.readSerialized();
+            assertInstanceOf(SerializedSerializable.class, result);
+        }
+        // callback should have been invoked for each class descriptor in the hierarchy
+        assertTrue(callCount[0] > 0, "annotation reader callback was never invoked");
+    }
+
+    @Test
+    void objectInputReadAndAvailable() throws Exception {
+        // test read(), read(byte[]), skip(), and available() via annotation callback
+        Serialized graph = ctx.serialize("test");
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (SerialStreamWriter writer = SerialStreamWriter.builder(baos)
+                .classAnnotationWriter((classDesc, w) -> {
+                    w.write(new byte[] { 1, 2, 3, 4, 5 });
+                })
+                .build()) {
+            writer.writeSerialized(graph);
+        }
+        byte[] bytes = baos.toByteArray();
+
+        try (SerialStreamReader reader = SerialStreamReader.builder(new ByteArrayInputStream(bytes))
+                .classAnnotationReader(r -> {
+                    // available should report remaining bytes in the current block
+                    assertTrue(r.available() > 0 || r.read() >= 0);
+                    // read single byte (we may have consumed one via the available test)
+                    // skip and read remaining
+                    byte[] buf = new byte[10];
+                    int n = r.read(buf, 0, buf.length);
+                    assertTrue(n > 0, "expected some bytes from read");
+                    return null;
+                })
+                .build()) {
+            reader.readSerialized();
+        }
+    }
+
+    @Test
+    void objectInputPartialReadWithSkipAnnotation() throws Exception {
+        // test that partial consumption in the callback is properly cleaned up
+        Serialized graph = ctx.serialize(new SimplePoint(1, 2));
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (SerialStreamWriter writer = SerialStreamWriter.builder(baos)
+                .classAnnotationWriter((classDesc, w) -> {
+                    w.writeInt(111);
+                    w.writeInt(222);
+                    w.writeInt(333);
+                })
+                .build()) {
+            writer.writeSerialized(graph);
+        }
+        byte[] bytes = baos.toByteArray();
+
+        // reader only reads the first int, leaving the rest for skipAnnotation
+        try (SerialStreamReader reader = SerialStreamReader.builder(new ByteArrayInputStream(bytes))
+                .classAnnotationReader(r -> {
+                    assertEquals(111, r.readInt());
+                    // remaining ints (222, 333) are left unconsumed
+                    return null;
+                })
+                .build()) {
+            Serialized result = reader.readSerialized();
+            assertInstanceOf(SerializedSerializable.class, result);
+            // verify the object still deserialized correctly despite partial annotation consumption
+            SimplePoint point = (SimplePoint) ctx.deserialize(result);
+            assertEquals(1, point.x);
+            assertEquals(2, point.y);
+        }
+    }
+
     // ======== Safety tests ========
 
     @Test

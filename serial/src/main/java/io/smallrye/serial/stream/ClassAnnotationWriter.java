@@ -13,6 +13,10 @@ import io.smallrye.serial.SerializedClass;
  * They appear immediately after a class descriptor's field definitions
  * and before the {@code TC_ENDBLOCKDATA} marker.
  * <p>
+ * The callback receives a {@link SerialOutput} so that it can write primitive
+ * values (via {@link java.io.DataOutput} methods) and {@link io.smallrye.serial.Serialized}
+ * objects (via {@link SerialOutput#writeSerialized}) to the annotation data.
+ * <p>
  * The default behavior is to write nothing (the caller writes the
  * {@code TC_ENDBLOCKDATA} marker), which matches what the standard
  * {@link java.io.ObjectOutputStream} does.
@@ -29,8 +33,8 @@ public interface ClassAnnotationWriter {
      * the {@code TC_ENDBLOCKDATA} marker; the caller handles that.
      *
      * @param classDesc the class descriptor being annotated (not {@code null})
-     * @param writer the stream writer to write annotation data to (not {@code null})
+     * @param writer the serial output to write annotation data to (not {@code null})
      * @throws IOException if an I/O error occurs while writing
      */
-    void write(SerializedClass classDesc, SerialStreamWriter writer) throws IOException;
+    void write(SerializedClass classDesc, SerialOutput writer) throws IOException;
 }

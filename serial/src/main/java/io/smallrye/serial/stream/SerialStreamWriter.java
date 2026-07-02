@@ -3,10 +3,8 @@ package io.smallrye.serial.stream;
 import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.io.UTFDataFormatException;
-import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 import java.util.List;
 
@@ -56,13 +54,13 @@ import io.smallrye.serial.impl.Util;
  * {@link Serialized} instance (by identity) is written more than once, subsequent
  * occurrences are emitted as {@code TC_REFERENCE}.
  * <p>
- * This class also implements {@link ObjectOutput} so that the
+ * This class implements {@link SerialOutput} so that the
  * {@link ClassAnnotationWriter} callback can write arbitrary data (block data
- * and objects) to the stream during class annotation processing.
+ * and {@link Serialized} objects) to the stream during class annotation processing.
  *
  * @see SerialStreamReader
  */
-public final class SerialStreamWriter implements ObjectOutput, Closeable {
+public final class SerialStreamWriter implements SerialOutput, Closeable {
 
     // ---- Wire format constants ----
 
@@ -95,9 +93,6 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
     // Block data buffer size (matches JDK's ObjectOutputStream)
     private static final int BLOCK_BUF_SIZE = 1024;
 
-    // Proxy superclass SUID (java.lang.reflect.Proxy declares this value)
-    private static final long PROXY_SUID = -2222568056686623797L;
-
     // ---- Instance fields ----
 
     /** Direct output (bypasses block data mode). */
@@ -116,9 +111,8 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
     private int blockPos;
     private boolean blockDataMode;
 
-    // Lazily created synthetic class descriptors for enum and proxy superclasses
+    // Lazily created synthetic class descriptor for enum superclass
     private SerializedEnumClass enumSuperDesc;
-    private SerializedSerializableClass proxySuperDesc;
 
     // ---- Builder ----
 
@@ -190,25 +184,6 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
     public void writeSerialized(Serialized serialized) throws IOException {
         exitBlockDataMode();
         writeSerialized0(Assert.checkNotNullParam("serialized", serialized));
-    }
-
-    // ---- ObjectOutput implementation ----
-
-    /**
-     * Write an object to the stream.
-     * The object must be a {@link Serialized} instance.
-     *
-     * @param obj the object to write (must be a {@link Serialized} instance)
-     * @throws IOException if an I/O error occurs
-     * @throws IllegalArgumentException if {@code obj} is not a {@link Serialized} instance
-     */
-    @Override
-    public void writeObject(Object obj) throws IOException {
-        if (obj instanceof Serialized s) {
-            writeSerialized(s);
-        } else {
-            throw new IllegalArgumentException("Only Serialized instances can be written");
-        }
     }
 
     /** {@inheritDoc} */
@@ -513,8 +488,7 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
             writeRawUTF(iface);
         }
         writeClassAnnotation(null);
-        // superClassDesc: java.lang.reflect.Proxy
-        writeClassDesc(getProxySuperDesc());
+        writeClassDesc(proxyClass.superClass());
     }
 
     /**
@@ -545,7 +519,7 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
             out.writeByte(SC_EXTERNALIZABLE | SC_BLOCK_DATA);
             out.writeShort(0); // no fields
             writeClassAnnotation(c);
-            out.writeByte(TC_NULL);
+            writeClassDesc(c.superClass());
         } else if (classDesc instanceof SerializedEnumClass c) {
             writeRawUTF(c.name());
             out.writeLong(c.serialVersionUID());
@@ -607,7 +581,7 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
 
     /**
      * Invoke the class annotation writer callback (if set), then write TC_ENDBLOCKDATA.
-     * The callback may use this writer's {@link ObjectOutput} methods to write data.
+     * The callback may use this writer's {@link SerialOutput} methods to write data.
      */
     private void writeClassAnnotation(SerializedClass classDesc) throws IOException {
         if (classAnnotationWriter != null && classDesc != null) {
@@ -953,22 +927,4 @@ public final class SerialStreamWriter implements ObjectOutput, Closeable {
         return desc;
     }
 
-    /**
-     * {@return the synthetic class descriptor for {@code java.lang.reflect.Proxy}, lazily created}
-     * Used as the superclass descriptor for proxy class descriptors. This descriptor
-     * has one object field "{@code h}" of type {@code java.lang.reflect.InvocationHandler}.
-     */
-    private SerializedSerializableClass getProxySuperDesc() {
-        SerializedSerializableClass desc = proxySuperDesc;
-        if (desc == null) {
-            desc = SerializedSerializableClass.builder()
-                    .name("java.lang.reflect.Proxy")
-                    .classLoader(SerializedNull.INSTANCE)
-                    .uid(PROXY_SUID)
-                    .addField("h", ClassDesc.of("java.lang.reflect.InvocationHandler"))
-                    .build();
-            proxySuperDesc = desc;
-        }
-        return desc;
-    }
 }
