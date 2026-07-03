@@ -7,30 +7,28 @@ import java.io.ObjectStreamException;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Constructor;
 
-import sun.reflect.ReflectionFactory;
-
 public final class ReadUtil {
     // Constructor.newInstance() must be used here rather than unreflecting to a MethodHandle, because the
     // Constructor returned by ReflectionFactory has a declaring class of the non-serializable superclass
     // (not the target class), so unreflectConstructor would create instances of the wrong class.
     static final ClassValue<Constructor<?>> serNewInstances = new ClassValue<>() {
         protected Constructor<?> computeValue(final Class<?> type) {
-            return rf.newConstructorForSerialization(type);
+            return Util.RF.newConstructorForSerialization(type);
         }
     };
     static final ClassValue<Constructor<?>> extNewInstances = new ClassValue<>() {
         protected Constructor<?> computeValue(final Class<?> type) {
-            return rf.newConstructorForExternalization(type);
+            return Util.RF.newConstructorForExternalization(type);
         }
     };
     static final ClassValue<MethodHandle> readObjects = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
-            return rf.readObjectForSerialization(type);
+            return Util.RF.readObjectForSerialization(type);
         }
     };
     static final ClassValue<MethodHandle> readObjectNoDatas = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
-            return rf.readObjectNoDataForSerialization(type);
+            return Util.RF.readObjectNoDataForSerialization(type);
         }
     };
     static final ClassValue<MethodHandle> defaultReadObjects = new ClassValue<MethodHandle>() {
@@ -41,10 +39,9 @@ public final class ReadUtil {
     };
     static final ClassValue<MethodHandle> readResolves = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
-            return rf.readResolveForSerialization(type);
+            return Util.RF.readResolveForSerialization(type);
         }
     };
-    private static final ReflectionFactory rf = ReflectionFactory.getReflectionFactory();
 
     private ReadUtil() {
     }

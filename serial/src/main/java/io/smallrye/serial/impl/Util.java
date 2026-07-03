@@ -1,6 +1,7 @@
 package io.smallrye.serial.impl;
 
 import java.io.IOException;
+import java.io.OptionalDataException;
 import java.lang.constant.ClassDesc;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -15,9 +16,60 @@ import io.smallrye.serial.SerializedProxyObject;
 import io.smallrye.serial.SerializedRecord;
 import io.smallrye.serial.SerializedSerializable;
 import io.smallrye.serial.spi.ObjectSerializer;
+import sun.reflect.ReflectionFactory;
 
 public final class Util {
     private Util() {
+    }
+
+    /**
+     * The shared {@link ReflectionFactory} instance.
+     */
+    static final ReflectionFactory RF = ReflectionFactory.getReflectionFactory();
+
+    /**
+     * Create an {@link OptionalDataException} indicating that no more data is available
+     * for the current object ({@code eof = true}).
+     *
+     * @return the exception (not {@code null})
+     */
+    public static OptionalDataException optionalDataEof() {
+        return RF.newOptionalDataExceptionForSerialization(true);
+    }
+
+    /**
+     * Create an {@link OptionalDataException} indicating that primitive data is available
+     * when an object was expected ({@code eof = false}).
+     *
+     * @param length the number of bytes of primitive data available
+     * @return the exception (not {@code null})
+     */
+    public static OptionalDataException optionalDataAvailable(int length) {
+        OptionalDataException e = RF.newOptionalDataExceptionForSerialization(false);
+        e.length = length;
+        return e;
+    }
+
+    /**
+     * {@return the human-readable name of the given primitive type code, or {@code null}
+     * if the type code does not represent a primitive type}
+     *
+     * @param typeCode the single-character type code
+     */
+    public static String primitiveTypeName(char typeCode) {
+        Primitive p = Primitive.forTypeCode(typeCode);
+        return p != null ? p.typeName() : null;
+    }
+
+    /**
+     * {@return the byte size of the given primitive type code, or 0 if the type code
+     * does not represent a primitive type}
+     *
+     * @param typeCode the single-character type code
+     */
+    public static int primitiveSizeOf(char typeCode) {
+        Primitive p = Primitive.forTypeCode(typeCode);
+        return p != null ? p.byteSize() : 0;
     }
 
     /**

@@ -63,7 +63,7 @@ public final class ClassSerializer implements ObjectSerializer {
                     : ctxt.serialize(cl);
 
             if (clazz.isArray()) {
-                SerializedClass componentType = (SerializedClass) ctxt.serialize(clazz.getComponentType());
+                SerializedClass componentType = ctxt.serialize(clazz.getComponentType(), SerializedClass.class);
                 return new SerializedArrayClass(cd, classLoader, 0L, componentType);
             }
 
@@ -74,15 +74,16 @@ public final class ClassSerializer implements ObjectSerializer {
 
             long uid = osc.getSerialVersionUID();
 
-            if (clazz.isEnum()) {
-                return new SerializedEnumClass(cd, classLoader, uid);
+            if (Enum.class.isAssignableFrom(clazz)) {
+                SerializedClass superClass = ctxt.serialize(clazz.getSuperclass(), SerializedClass.class);
+                return new SerializedEnumClass(cd, classLoader, uid, superClass);
             }
 
             if (Externalizable.class.isAssignableFrom(clazz)) {
                 SerializedClass superClass = null;
                 Class<?> sup = clazz.getSuperclass();
                 if (sup != null && Serializable.class.isAssignableFrom(sup)) {
-                    superClass = (SerializedClass) ctxt.serialize(sup);
+                    superClass = ctxt.serialize(sup, SerializedClass.class);
                 }
                 return new SerializedExternalizableClass(cd, classLoader, uid, superClass);
             }
@@ -103,7 +104,7 @@ public final class ClassSerializer implements ObjectSerializer {
             SerializedSerializableClass superClass = null;
             Class<?> sup = clazz.getSuperclass();
             if (sup != null && Serializable.class.isAssignableFrom(sup)) {
-                superClass = (SerializedSerializableClass) ctxt.serialize(sup);
+                superClass = ctxt.serialize(sup, SerializedSerializableClass.class);
             }
             try {
                 return (SerializedSerializableClass) newSerializedSerializableClass.invokeExact(
@@ -170,13 +171,7 @@ public final class ClassSerializer implements ObjectSerializer {
             int offset;
             if (type.isPrimitive()) {
                 offset = primOffset;
-                primOffset += switch (type.descriptorString().charAt(0)) {
-                    case 'B', 'Z' -> 1;
-                    case 'C', 'S' -> 2;
-                    case 'I', 'F' -> 4;
-                    case 'J', 'D' -> 8;
-                    default -> throw new IllegalStateException("unexpected primitive descriptor: " + type);
-                };
+                primOffset += Util.primitiveSizeOf(type.descriptorString().charAt(0));
             } else {
                 offset = objOffset++;
             }

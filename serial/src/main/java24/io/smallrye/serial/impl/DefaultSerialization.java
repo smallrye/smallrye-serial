@@ -5,11 +5,11 @@ import java.lang.invoke.MethodHandle;
 import sun.reflect.ReflectionFactory;
 
 @SuppressWarnings("unused") // MR JAR layer
-final class JDK24Specific {
+final class DefaultSerialization {
     // Much simpler JDK24+ version! Remove once the baseline is 24 or later.
     private static final ReflectionFactory rf = ReflectionFactory.getReflectionFactory();
 
-    private JDK24Specific() {
+    private DefaultSerialization() {
     }
 
     static MethodHandle defaultWriteObjectForSerialization(final Class<?> type) {

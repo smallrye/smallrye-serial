@@ -76,8 +76,9 @@ public final class SerializedRecord extends Serialized {
      * @param ctxt the serializer context (must not be {@code null})
      * @throws IOException if serialization fails
      */
+    @SuppressWarnings("unused") // accessed by method handle
     SerializedRecord(final Object record, final ObjectSerializer.Context ctxt) throws IOException {
-        this.recordClass = (SerializedRecordClass) ctxt.serialize(record.getClass());
+        this.recordClass = ctxt.serialize(record.getClass(), SerializedRecordClass.class);
         ctxt.preSetSerialized(this);
 
         Class<?> recordType = record.getClass();

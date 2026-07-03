@@ -3,6 +3,7 @@ package io.smallrye.serial;
 import java.lang.constant.ClassDesc;
 
 import io.smallrye.common.constraint.Assert;
+import io.smallrye.serial.impl.Util;
 
 /**
  * A descriptor for a single field in a serialized class's stream field layout.
@@ -49,12 +50,6 @@ public record SerialField(String name, ClassDesc type, int offset) {
      * {@return the byte size of this field's primitive type, or 0 if this is not a primitive field}
      */
     public int primitiveSize() {
-        return switch (typeCode()) {
-            case 'B', 'Z' -> 1;
-            case 'C', 'S' -> 2;
-            case 'I', 'F' -> 4;
-            case 'J', 'D' -> 8;
-            default -> 0;
-        };
+        return Util.primitiveSizeOf(typeCode());
     }
 }

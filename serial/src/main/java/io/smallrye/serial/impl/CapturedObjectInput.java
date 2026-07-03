@@ -2,7 +2,6 @@ package io.smallrye.serial.impl;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.NotActiveException;
 import java.io.ObjectInput;
 import java.util.List;
 import java.util.Objects;
@@ -43,11 +42,11 @@ public final class CapturedObjectInput implements ObjectInput {
         StreamData current = current();
         for (;;) {
             if (current == null) {
-                throw new EOFException();
+                throw Util.optionalDataEof();
             } else if (current instanceof StreamData.OfObjects o && index < o.size()) {
                 return o;
             } else if (current instanceof StreamData.OfBytes b && index < b.size()) {
-                throw new NotActiveException("No object at this point in the stream");
+                throw Util.optionalDataAvailable(b.size() - index);
             }
             current = next();
         }

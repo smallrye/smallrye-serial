@@ -8,6 +8,7 @@ import java.util.ListIterator;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.IntMap;
+import io.smallrye.serial.impl.Util;
 
 /**
  * A utility for formatting the structure of {@link Serialized} object graphs as human-readable,
@@ -206,36 +207,12 @@ public final class Printer {
      * @return the human-readable name (not {@code null})
      */
     static String typeName(final ClassDesc desc) {
-        if (desc.isPrimitive()) {
-            return switch (desc.descriptorString().charAt(0)) {
-                case 'Z' -> "boolean";
-                case 'B' -> "byte";
-                case 'C' -> "char";
-                case 'S' -> "short";
-                case 'I' -> "int";
-                case 'J' -> "long";
-                case 'F' -> "float";
-                case 'D' -> "double";
-                case 'V' -> "void";
-                default -> desc.descriptorString();
-            };
-        }
-        if (desc.isArray()) {
-            return typeName(desc.componentType()) + "[]";
-        }
-        String d = desc.descriptorString();
-        return d.substring(1, d.length() - 1).replace('/', '.');
-    }
-
-    /**
-     * Compute a human-readable array type name from an array class descriptor,
-     * e.g. {@code "java.lang.Object[]"} or {@code "int[][]"}.
-     *
-     * @param arrayType the array class descriptor (must not be {@code null})
-     * @return the type name with bracket suffixes (not {@code null})
-     */
-    static String arrayTypeName(final SerializedArrayClass arrayType) {
-        return arrayType.leafComponentType().name() + "[]".repeat(arrayType.dimensions());
+        String ds = desc.descriptorString();
+        return switch (ds.charAt(0)) {
+            case '[' -> typeName(desc.componentType()) + "[]";
+            case 'L' -> ds.substring(1, ds.length() - 1).replace('/', '.');
+            default -> Util.primitiveTypeName(ds.charAt(0));
+        };
     }
 
     // ---- PrintContext (per-invocation mutable state) ----
@@ -470,6 +447,11 @@ public final class Printer {
             }
             openBlock();
             printVersionedClassBody(ec);
+            if (ec.superClass() != null) {
+                newLine();
+                sb.append("superClass: ");
+                printValue(ec.superClass());
+            }
             closeBlock();
         }
 

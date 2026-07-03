@@ -32,8 +32,9 @@ public final class SerializedObjectArray extends SerializedArray {
      * @param source the source object array (must not be {@code null})
      * @param ctxt the serializer context (must not be {@code null})
      */
+    @SuppressWarnings("unused") // accessed by method handle
     SerializedObjectArray(final Object[] source, final ObjectSerializer.Context ctxt) throws IOException {
-        this.arrayType = (SerializedArrayClass) ctxt.serialize(source.getClass());
+        this.arrayType = ctxt.serialize(source.getClass(), SerializedArrayClass.class);
         this.array = new Serialized[source.length];
         ctxt.preSetSerialized(this);
         for (int i = 0; i < source.length; i++) {
@@ -51,6 +52,7 @@ public final class SerializedObjectArray extends SerializedArray {
     /**
      * {@return the length of the serialized array}
      */
+    @Override
     public int length() {
         return array.length;
     }

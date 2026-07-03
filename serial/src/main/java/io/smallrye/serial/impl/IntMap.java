@@ -16,7 +16,11 @@ import java.util.function.ToIntFunction;
  * <li>{@link #equality()} — value semantics ({@link Object#hashCode}, {@link Object#equals})</li>
  * </ul>
  * <p>
- * This class uses linear probing with power-of-two capacity and Fibonacci hash spreading.
+ * This class uses triangular probing with power-of-two capacity and Fibonacci hash spreading.
+ * Triangular probing visits slots at offsets 0, 1, 3, 6, 10, ... (triangular numbers),
+ * breaking up the linear clusters that degrade plain linear probing at higher load factors.
+ * With power-of-two capacity, triangular probing is guaranteed to visit every slot.
+ * <p>
  * It supports only insertion and lookup; there is no removal or iteration support.
  *
  * @param <K> the key type
@@ -122,6 +126,7 @@ public final class IntMap<K> {
         final Object[] k = this.keys;
         final int mask = k.length - 1;
         int idx = spread(hashFunction.applyAsInt(key));
+        int step = 0;
         for (;;) {
             Object existing = k[idx & mask];
             if (existing == null) {
@@ -130,7 +135,7 @@ public final class IntMap<K> {
             if (equalsFunction.test((K) existing, key)) {
                 return values[idx & mask];
             }
-            idx++;
+            idx += ++step;
         }
     }
 
@@ -145,6 +150,7 @@ public final class IntMap<K> {
         final Object[] k = this.keys;
         final int mask = k.length - 1;
         int idx = spread(hashFunction.applyAsInt(key));
+        int step = 0;
         for (;;) {
             Object existing = k[idx & mask];
             if (existing == null) {
@@ -153,7 +159,7 @@ public final class IntMap<K> {
             if (equalsFunction.test((K) existing, key)) {
                 return true;
             }
-            idx++;
+            idx += ++step;
         }
     }
 
@@ -171,6 +177,7 @@ public final class IntMap<K> {
         int[] v = this.values;
         int mask = k.length - 1;
         int idx = spread(hashFunction.applyAsInt(key));
+        int step = 0;
         for (;;) {
             Object existing = k[idx & mask];
             if (existing == null) {
@@ -186,7 +193,7 @@ public final class IntMap<K> {
                 v[idx & mask] = value;
                 return old;
             }
-            idx++;
+            idx += ++step;
         }
     }
 
@@ -200,13 +207,17 @@ public final class IntMap<K> {
     // ---- Internal ----
 
     /**
-     * Spread a raw hash code using Fibonacci hashing for a more uniform distribution
-     * across power-of-two table sizes.
+     * Spread a raw hash code using an xor-shift mix followed by Fibonacci hashing
+     * for a more uniform distribution across power-of-two table sizes.
+     * The xor-shift pre-mix breaks up correlated upper bits in hash codes
+     * (e.g. from {@link System#identityHashCode}) that the Fibonacci multiply
+     * alone does not fully disperse.
      *
      * @param hash the raw hash code
      * @return the spread index (pre-mask)
      */
-    private int spread(final int hash) {
+    private int spread(int hash) {
+        hash ^= hash >>> 16;
         return (hash * PHI) >>> shift;
     }
 
@@ -226,8 +237,9 @@ public final class IntMap<K> {
             Object k = oldKeys[i];
             if (k != null) {
                 int idx = spread(hashFunction.applyAsInt((K) k));
+                int step = 0;
                 while (newKeys[idx & newMask] != null) {
-                    idx++;
+                    idx += ++step;
                 }
                 newKeys[idx & newMask] = k;
                 newValues[idx & newMask] = oldValues[i];

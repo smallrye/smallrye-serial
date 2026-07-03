@@ -74,7 +74,7 @@ public final class SerializedExternalizable extends Serialized {
      * @throws IOException if the object's {@code writeExternal} method throws an I/O error
      */
     public SerializedExternalizable(final ObjectSerializer.Context ctxt, final Externalizable ext) throws IOException {
-        serializedClass = (SerializedExternalizableClass) ctxt.serialize(ext.getClass());
+        serializedClass = ctxt.serialize(ext.getClass(), SerializedExternalizableClass.class);
         ctxt.preSetSerialized(this);
         try (CapturingObjectOutput oo = new CapturingObjectOutput(ctxt)) {
             ext.writeExternal(oo);

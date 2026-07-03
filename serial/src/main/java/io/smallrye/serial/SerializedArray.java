@@ -9,6 +9,11 @@ public abstract class SerializedArray extends Serialized {
     }
 
     /**
+     * {@return the length of the array}
+     */
+    public abstract int length();
+
+    /**
      * {@return a copy of the array corresponding to this serialized representation (not {@code null})}
      * The returned value is always a fresh copy; modifications to it do not affect this instance.
      * The runtime type of the returned object is the appropriate array type

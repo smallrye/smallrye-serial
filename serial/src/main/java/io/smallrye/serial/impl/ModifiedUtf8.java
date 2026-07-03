@@ -1,5 +1,7 @@
 package io.smallrye.serial.impl;
 
+import static io.smallrye.serial.impl.Util.BE16;
+
 import java.io.UTFDataFormatException;
 
 /**
@@ -33,14 +35,7 @@ public final class ModifiedUtf8 {
     public static long encodedLength(final String str) {
         long len = 0;
         for (int i = 0; i < str.length(); i++) {
-            char c = str.charAt(i);
-            if (c > 0 && c <= 0x7f) {
-                len++;
-            } else if (c <= 0x7ff) {
-                len += 2;
-            } else {
-                len += 3;
-            }
+            len += ModifiedUtf8Codec.encodedLength(str.charAt(i));
         }
         return len;
     }
@@ -59,15 +54,18 @@ public final class ModifiedUtf8 {
         int start = off;
         for (int i = 0; i < str.length(); i++) {
             char c = str.charAt(i);
-            if (c > 0 && c <= 0x7f) {
-                buf[off++] = (byte) c;
-            } else if (c <= 0x7ff) {
-                buf[off++] = (byte) (0xc0 | 0x1f & c >> 6);
-                buf[off++] = (byte) (0x80 | 0x3f & c);
-            } else {
-                buf[off++] = (byte) (0xe0 | 0x0f & c >> 12);
-                buf[off++] = (byte) (0x80 | 0x3f & c >> 6);
-                buf[off++] = (byte) (0x80 | 0x3f & c);
+            switch (ModifiedUtf8Codec.encodedLength(c)) {
+                case 1 -> buf[off++] = (byte) c;
+                case 2 -> {
+                    BE16.set(buf, off, ModifiedUtf8Codec.encode2(c));
+                    off += 2;
+                }
+                case 3 -> {
+                    int v = ModifiedUtf8Codec.encode3(c);
+                    buf[off++] = (byte) (v >>> 16);
+                    BE16.set(buf, off, (short) v);
+                    off += 2;
+                }
             }
         }
         return off - start;
@@ -83,19 +81,15 @@ public final class ModifiedUtf8 {
      * @throws UTFDataFormatException if the byte sequence is malformed
      */
     public static String decode(final byte[] buf, int off, final int len) throws UTFDataFormatException {
-        // range-check decoding: classify bytes by their high-bit pattern
         StringBuilder sb = new StringBuilder(len >> 1);
         int end = off + len;
         while (off < end) {
             int a = buf[off++] & 0xff;
             if (a < 0x80) {
-                // one-byte character (0xxxxxxx)
                 sb.append((char) a);
             } else if (a < 0xc0) {
-                // bare continuation byte — invalid as a leading byte
                 throw new UTFDataFormatException("Invalid leading byte: 0x" + Integer.toHexString(a));
             } else if (a < 0xe0) {
-                // two-byte character (110xxxxx 10xxxxxx)
                 if (off >= end) {
                     throw new UTFDataFormatException("Truncated two-byte sequence");
                 }
@@ -103,9 +97,8 @@ public final class ModifiedUtf8 {
                 if ((b & 0xc0) != 0x80) {
                     throw new UTFDataFormatException("Invalid continuation byte");
                 }
-                sb.append((char) ((a & 0x1f) << 6 | b & 0x3f));
+                sb.append(ModifiedUtf8Codec.decode2((short) (a << 8 | b)));
             } else if (a < 0xf0) {
-                // three-byte character (1110xxxx 10xxxxxx 10xxxxxx)
                 if (off + 1 >= end) {
                     throw new UTFDataFormatException("Truncated three-byte sequence");
                 }
@@ -114,9 +107,8 @@ public final class ModifiedUtf8 {
                 if ((b & 0xc0) != 0x80 || (c & 0xc0) != 0x80) {
                     throw new UTFDataFormatException("Invalid continuation byte");
                 }
-                sb.append((char) ((a & 0x0f) << 12 | (b & 0x3f) << 6 | c & 0x3f));
+                sb.append(ModifiedUtf8Codec.decode3(a << 16 | b << 8 | c));
             } else {
-                // four-byte or higher — not valid in modified UTF-8
                 throw new UTFDataFormatException("Invalid leading byte: 0x" + Integer.toHexString(a));
             }
         }

@@ -5,20 +5,16 @@ import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.lang.invoke.MethodHandle;
 
-import sun.reflect.ReflectionFactory;
-
 public final class WriteUtil {
-
-    private static final ReflectionFactory rf = ReflectionFactory.getReflectionFactory();
 
     static final ClassValue<MethodHandle> writeReplaces = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
-            return rf.writeReplaceForSerialization(type);
+            return Util.RF.writeReplaceForSerialization(type);
         }
     };
     static final ClassValue<MethodHandle> writeObjects = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
-            return rf.writeObjectForSerialization(type);
+            return Util.RF.writeObjectForSerialization(type);
         }
     };
     static final ClassValue<MethodHandle> defaultWriteObjects = new ClassValue<MethodHandle>() {

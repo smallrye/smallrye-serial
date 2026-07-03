@@ -35,7 +35,7 @@ public final class ArraySerializer implements ObjectSerializer {
     public Serialized serialize(final Context ctxt, final Object object) throws IOException {
         Class<?> clazz = object.getClass();
         if (clazz.isArray()) {
-            SerializedArrayClass arrayType = (SerializedArrayClass) ctxt.serialize(clazz);
+            SerializedArrayClass arrayType = ctxt.serialize(clazz, SerializedArrayClass.class);
             return switch (clazz.descriptorString().charAt(1)) {
                 case 'Z' -> new SerializedBooleanArray(arrayType, (boolean[]) object);
                 case 'B' -> new SerializedByteArray(arrayType, (byte[]) object);

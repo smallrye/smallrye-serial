@@ -28,7 +28,7 @@ public final class ProxySerializer implements ObjectSerializer {
             Class<?>[] interfaces = object.getClass().getInterfaces();
             var interfaceNames = Arrays.stream(interfaces).map(Class::getName).toList();
             Serialized classLoader = ctxt.serialize(object.getClass().getClassLoader());
-            SerializedClass superClass = (SerializedClass) ctxt.serialize(Proxy.class);
+            SerializedClass superClass = ctxt.serialize(Proxy.class, SerializedClass.class);
             SerializedProxyClass proxyClass = new SerializedProxyClass(interfaceNames, classLoader, superClass);
             return Util.newSerializedProxyObject(object, proxyClass, ctxt);
         } else {

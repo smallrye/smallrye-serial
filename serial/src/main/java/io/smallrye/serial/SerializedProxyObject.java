@@ -35,7 +35,7 @@ public final class SerializedProxyObject extends Serialized {
     }
 
     private final SerializedProxyClass proxyClass;
-    private Serialized invocationHandler;
+    private final Serialized invocationHandler;
 
     /**
      * Construct a new instance from pre-existing data.
@@ -78,6 +78,7 @@ public final class SerializedProxyObject extends Serialized {
      * @param proxyClass the proxy class descriptor (must not be {@code null})
      * @param ctxt the serializer context (must not be {@code null})
      */
+    @SuppressWarnings("unused") // accessed by method handle
     SerializedProxyObject(final Object proxy, final SerializedProxyClass proxyClass, final ObjectSerializer.Context ctxt)
             throws IOException {
         this.proxyClass = proxyClass;
