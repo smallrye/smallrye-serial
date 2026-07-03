@@ -74,8 +74,9 @@ public final class SerializedSerializable extends Serialized {
      * @param object the object being serialized (must not be {@code null})
      * @param ctxt the context (must not be {@code null})
      */
+    @SuppressWarnings("unused") // accessed by method handle
     SerializedSerializable(final Object object, final ObjectSerializer.Context ctxt) throws IOException {
-        this.streamClass = (SerializedSerializableClass) ctxt.serialize(object.getClass());
+        this.streamClass = ctxt.serialize(object.getClass(), SerializedSerializableClass.class);
         ctxt.preSetSerialized(this);
         this.data = List.copyOf(buildData(ctxt, object, object.getClass(), streamClass, new ArrayList<>()));
     }
@@ -155,10 +156,13 @@ public final class SerializedSerializable extends Serialized {
             if (clazz == null) {
                 buildData(context, object, null, streamClass.superClass(), data);
                 // no local class available, write defaults
+                int pbs = streamClass.primitiveBufferSize();
+                int obs = streamClass.objectBufferSize();
                 data.add(new SerialData(
                         streamClass,
-                        StreamData.of(new byte[streamClass.primitiveBufferSize()]),
-                        StreamData.of(Collections.nCopies(streamClass.objectBufferSize(), SerializedNull.INSTANCE)),
+                        pbs == 0 ? StreamData.OfBytes.EMPTY : StreamData.of(new byte[pbs]),
+                        obs == 0 ? StreamData.OfObjects.EMPTY
+                                : StreamData.of(Collections.nCopies(obs, SerializedNull.INSTANCE)),
                         List.of()));
                 return data;
             } else {

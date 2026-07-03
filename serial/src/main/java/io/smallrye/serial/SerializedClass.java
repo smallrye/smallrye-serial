@@ -3,12 +3,13 @@ package io.smallrye.serial;
 import java.lang.constant.ClassDesc;
 
 import io.smallrye.common.constraint.Assert;
+import io.smallrye.serial.impl.Util;
 
 /**
  * The serialized representation of a {@link Class}.
  * <p>
  * This is the sealed base of the class descriptor hierarchy. Every class descriptor
- * carries a {@linkplain #classDesc() class descriptor} and a {@linkplain #classLoader() class loader}.
+ * carries a {@linkplain #descriptor() class descriptor} and a {@linkplain #classLoader() class loader}.
  * Subtypes add data specific to the serialization mechanism of the class they describe.
  *
  * @see SerializedNonSerializableClass
@@ -36,13 +37,20 @@ public abstract sealed class SerializedClass extends Serialized
     /**
      * {@return the class descriptor for this serialized class (not {@code null})}
      */
-    public ClassDesc classDesc() {
+    public ClassDesc descriptor() {
         return classDesc;
     }
 
     /**
+     * {@return the class descriptor string for this serialized class (must not be {@code null})}
+     */
+    public String descriptorString() {
+        return classDesc.descriptorString();
+    }
+
+    /**
      * {@return the name of the serialized class in {@link Class#getName()} format (not {@code null})}
-     * The name is lazily computed from the {@linkplain #classDesc() class descriptor} and cached.
+     * The name is lazily computed from the {@linkplain #descriptor() class descriptor} and cached.
      */
     public String name() {
         String n = name;
@@ -57,24 +65,12 @@ public abstract sealed class SerializedClass extends Serialized
      */
     private String computeName() {
         String desc = classDesc.descriptorString();
-        if (classDesc.isArray()) {
-            return desc.replace('/', '.');
-        }
-        if (classDesc.isPrimitive()) {
-            return switch (desc.charAt(0)) {
-                case 'B' -> "byte";
-                case 'C' -> "char";
-                case 'D' -> "double";
-                case 'F' -> "float";
-                case 'I' -> "int";
-                case 'J' -> "long";
-                case 'S' -> "short";
-                case 'Z' -> "boolean";
-                case 'V' -> "void";
-                default -> throw new IllegalStateException();
-            };
-        }
-        return desc.substring(1, desc.length() - 1).replace('/', '.');
+        char typeCode = desc.charAt(0);
+        return switch (typeCode) {
+            case '[' -> desc.replace('/', '.');
+            case 'L' -> desc.substring(1, desc.length() - 1).replace('/', '.');
+            default -> Util.primitiveTypeName(typeCode);
+        };
     }
 
     /**

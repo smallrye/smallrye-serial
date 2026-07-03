@@ -1,6 +1,7 @@
 package io.smallrye.serial;
 
 import java.io.IOException;
+import java.io.StreamCorruptedException;
 import java.util.function.Consumer;
 
 import io.smallrye.common.constraint.Assert;
@@ -27,15 +28,15 @@ public final class SerializedEnum extends Serialized {
     }
 
     private final SerializedEnumClass enumClass;
-    private final Serialized constantName;
+    private final SerializedString constantName;
 
     /**
      * Construct a new instance.
      *
      * @param enumClass the class descriptor of the enum type (must not be {@code null})
-     * @param constantName the serialized name of the enum constant (must not be {@code null})
+     * @param constantName the name of the enum constant (must not be {@code null})
      */
-    public SerializedEnum(final SerializedEnumClass enumClass, final Serialized constantName) {
+    public SerializedEnum(final SerializedEnumClass enumClass, final SerializedString constantName) {
         this.enumClass = Assert.checkNotNullParam("enumClass", enumClass);
         this.constantName = Assert.checkNotNullParam("constantName", constantName);
     }
@@ -50,13 +51,18 @@ public final class SerializedEnum extends Serialized {
      * @param preSet callback to register this instance before the name is read (must not be {@code null})
      * @param nameReader supplier of the serialized constant name (must not be {@code null})
      * @throws IOException if an I/O error occurs while reading
+     * @throws StreamCorruptedException if the constant name read from the stream is not a string
      */
     public SerializedEnum(final SerializedEnumClass enumClass,
             final Consumer<Serialized> preSet,
             final NameReader nameReader) throws IOException {
         this.enumClass = Assert.checkNotNullParam("enumClass", enumClass);
         Assert.checkNotNullParam("preSet", preSet).accept(this);
-        this.constantName = Assert.checkNotNullParam("nameReader", nameReader).read();
+        Serialized name = Assert.checkNotNullParam("nameReader", nameReader).read();
+        if (!(name instanceof SerializedString ss)) {
+            throw new StreamCorruptedException("enum constant name is not a string");
+        }
+        this.constantName = ss;
     }
 
     /**
@@ -67,9 +73,9 @@ public final class SerializedEnum extends Serialized {
     }
 
     /**
-     * {@return the serialized name of the enum constant (not {@code null})}
+     * {@return the name of the enum constant (not {@code null})}
      */
-    public Serialized constantName() {
+    public SerializedString constantName() {
         return constantName;
     }
 }

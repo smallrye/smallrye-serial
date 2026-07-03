@@ -93,62 +93,48 @@ public final class RecordFactoryGenerator {
         int[] componentSlots = new int[components.length];
         for (int i = 0; i < components.length; i++) {
             componentSlots[i] = nextSlot;
-            nextSlot += slotSize(components[i].getType());
+            Primitive p = Primitive.forClass(components[i].getType());
+            nextSlot += p != null ? p.slotSize() : 1;
         }
 
         // phase 1: read each component value from GetField into a local variable
         for (int i = 0; i < components.length; i++) {
-            RecordComponent comp = components[i];
-            Class<?> type = comp.getType();
-            String name = comp.getName();
-
+            int slot = componentSlots[i];
+            Primitive p = Primitive.forClass(components[i].getType());
             code.aload(fieldsSlot);
-            code.ldc(name);
-
-            if (type == boolean.class) {
-                code.iconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_boolean, CD_STRING, ConstantDescs.CD_boolean));
-                code.istore(componentSlots[i]);
-            } else if (type == byte.class) {
-                code.iconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_byte, CD_STRING, ConstantDescs.CD_byte));
-                code.istore(componentSlots[i]);
-            } else if (type == char.class) {
-                code.iconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_char, CD_STRING, ConstantDescs.CD_char));
-                code.istore(componentSlots[i]);
-            } else if (type == short.class) {
-                code.iconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_short, CD_STRING, ConstantDescs.CD_short));
-                code.istore(componentSlots[i]);
-            } else if (type == int.class) {
-                code.iconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_int, CD_STRING, ConstantDescs.CD_int));
-                code.istore(componentSlots[i]);
-            } else if (type == long.class) {
-                code.lconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_long, CD_STRING, ConstantDescs.CD_long));
-                code.lstore(componentSlots[i]);
-            } else if (type == float.class) {
-                code.fconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_float, CD_STRING, ConstantDescs.CD_float));
-                code.fstore(componentSlots[i]);
-            } else if (type == double.class) {
-                code.dconst_0();
-                code.invokevirtual(CD_GET_FIELD, "get",
-                        MethodTypeDesc.of(ConstantDescs.CD_double, CD_STRING, ConstantDescs.CD_double));
-                code.dstore(componentSlots[i]);
-            } else {
+            code.ldc(components[i].getName());
+            if (p == null) {
                 code.aconst_null();
                 code.invokevirtual(CD_GET_FIELD, "get", MethodTypeDesc.of(CD_OBJECT, CD_STRING, CD_OBJECT));
-                code.astore(componentSlots[i]);
+                code.astore(slot);
+            } else {
+                switch (p) {
+                    case BOOLEAN, BYTE, CHAR, SHORT, INT -> {
+                        code.iconst_0();
+                        code.invokevirtual(CD_GET_FIELD, "get",
+                                MethodTypeDesc.of(p.classDesc(), CD_STRING, p.classDesc()));
+                        code.istore(slot);
+                    }
+                    case LONG -> {
+                        code.lconst_0();
+                        code.invokevirtual(CD_GET_FIELD, "get",
+                                MethodTypeDesc.of(p.classDesc(), CD_STRING, p.classDesc()));
+                        code.lstore(slot);
+                    }
+                    case FLOAT -> {
+                        code.fconst_0();
+                        code.invokevirtual(CD_GET_FIELD, "get",
+                                MethodTypeDesc.of(p.classDesc(), CD_STRING, p.classDesc()));
+                        code.fstore(slot);
+                    }
+                    case DOUBLE -> {
+                        code.dconst_0();
+                        code.invokevirtual(CD_GET_FIELD, "get",
+                                MethodTypeDesc.of(p.classDesc(), CD_STRING, p.classDesc()));
+                        code.dstore(slot);
+                    }
+                    case VOID -> throw new IllegalArgumentException("void record component");
+                }
             }
         }
 
@@ -156,21 +142,20 @@ public final class RecordFactoryGenerator {
         code.new_(recordDesc);
         code.dup();
         for (int i = 0; i < components.length; i++) {
-            Class<?> type = components[i].getType();
-            if (type == boolean.class || type == byte.class || type == char.class
-                    || type == short.class || type == int.class) {
-                code.iload(componentSlots[i]);
-            } else if (type == long.class) {
-                code.lload(componentSlots[i]);
-            } else if (type == float.class) {
-                code.fload(componentSlots[i]);
-            } else if (type == double.class) {
-                code.dload(componentSlots[i]);
-            } else {
-                code.aload(componentSlots[i]);
-                // cast Object to the declared component type for the constructor
-                if (type != Object.class) {
+            int slot = componentSlots[i];
+            Primitive p = Primitive.forClass(components[i].getType());
+            if (p == null) {
+                code.aload(slot);
+                if (components[i].getType() != Object.class) {
                     code.checkcast(paramDescs[i]);
+                }
+            } else {
+                switch (p) {
+                    case BOOLEAN, BYTE, CHAR, SHORT, INT -> code.iload(slot);
+                    case LONG -> code.lload(slot);
+                    case FLOAT -> code.fload(slot);
+                    case DOUBLE -> code.dload(slot);
+                    case VOID -> throw new IllegalArgumentException("void record component");
                 }
             }
         }
@@ -207,13 +192,6 @@ public final class RecordFactoryGenerator {
         } catch (IllegalAccessException e) {
             throw Util.asError(e);
         }
-    }
-
-    /**
-     * {@return the number of local variable slots required for the given type}
-     */
-    private static int slotSize(Class<?> type) {
-        return (type == long.class || type == double.class) ? 2 : 1;
     }
 
     /**

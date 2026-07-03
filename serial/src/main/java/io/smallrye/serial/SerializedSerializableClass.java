@@ -34,7 +34,7 @@ public final class SerializedSerializableClass extends SerializedFieldedClass im
      * @param uid the serial version UID
      * @param hasWriteMethod {@code true} if the class has a custom {@code writeObject} method
      */
-    // called via MethodHandle from ClassSerializer
+    @SuppressWarnings("unused") // accessed by method handle
     SerializedSerializableClass(final ClassDesc classDesc, final Serialized classLoader,
             final SerializedSerializableClass superClass,
             final List<SerialField> fields, final int primitiveBufferSize, final int objectBufferSize,
@@ -218,13 +218,7 @@ public final class SerializedSerializableClass extends SerializedFieldedClass im
                 int offset;
                 if (type.isPrimitive()) {
                     offset = po;
-                    po += switch (tc) {
-                        case 'B', 'Z' -> 1;
-                        case 'C', 'S' -> 2;
-                        case 'I', 'F' -> 4;
-                        case 'J', 'D' -> 8;
-                        default -> throw Assert.impossibleSwitchCase(tc);
-                    };
+                    po += Util.primitiveSizeOf(tc);
                 } else {
                     offset = oo++;
                 }

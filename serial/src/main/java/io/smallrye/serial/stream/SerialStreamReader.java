@@ -11,6 +11,7 @@ import java.io.InvalidObjectException;
 import java.io.StreamCorruptedException;
 import java.io.WriteAbortedException;
 import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDescs;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,6 +41,7 @@ import io.smallrye.serial.SerializedProxyObject;
 import io.smallrye.serial.SerializedSerializable;
 import io.smallrye.serial.SerializedSerializableClass;
 import io.smallrye.serial.SerializedShortArray;
+import io.smallrye.serial.SerializedSpecialSerializableClass;
 import io.smallrye.serial.SerializedString;
 import io.smallrye.serial.StreamData;
 import io.smallrye.serial.impl.ModifiedUtf8;
@@ -272,15 +274,6 @@ public final class SerialStreamReader implements SerialInput, Closeable {
     // ---- Handle management ----
 
     /**
-     * Assign a handle to a Serialized node. The node is appended to the handle table.
-     *
-     * @param s the Serialized node to register
-     */
-    private void assignHandle(Serialized s) {
-        handles.add(s);
-    }
-
-    /**
      * Read a TC_REFERENCE and resolve it from the handle table.
      *
      * @return the referenced Serialized node (not {@code null})
@@ -306,7 +299,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
     private SerializedString readString() throws IOException {
         int utfLen = in.readUnsignedShort();
         SerializedString s = new SerializedString(ModifiedUtf8.decode(readNBytes(utfLen), 0, utfLen));
-        assignHandle(s);
+        handles.add(s);
         return s;
     }
 
@@ -322,7 +315,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         }
         byte[] buf = readNBytes((int) utfLen);
         SerializedString s = new SerializedString(ModifiedUtf8.decode(buf, 0, (int) utfLen));
-        assignHandle(s);
+        handles.add(s);
         return s;
     }
 
@@ -433,14 +426,14 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             fields[i] = new FieldDesc(fieldName, type);
         }
 
-        // class annotation (skip or delegate to callback)
-        readClassAnnotation();
+        // class annotation: read and extract class loader
+        Serialized classLoader = readClassAnnotation();
 
         // superclass descriptor
         Serialized superDesc = readClassDescOrRef();
 
         // build the appropriate class descriptor type from the flags
-        Serialized classDesc = buildClassDesc(name, uid, flags, fields, superDesc);
+        Serialized classDesc = buildClassDesc(name, uid, flags, fields, superDesc, classLoader);
         handles.set(handleIndex, classDesc);
         return classDesc;
     }
@@ -453,34 +446,39 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * @param flags the class descriptor flags byte
      * @param fields the parsed field descriptors
      * @param superDesc the superclass descriptor (may be {@link SerializedNull#INSTANCE})
+     * @param classLoader the class loader from the class annotation (not {@code null})
      * @return the constructed class descriptor node
      */
     private Serialized buildClassDesc(String name, long uid, int flags, FieldDesc[] fields,
-            Serialized superDesc) throws IOException {
+            Serialized superDesc, Serialized classLoader) throws IOException {
         boolean isEnum = (flags & SC_ENUM) != 0;
         boolean isSerializable = (flags & SC_SERIALIZABLE) != 0;
         boolean isExternalizable = (flags & SC_EXTERNALIZABLE) != 0;
 
         ClassDesc cd = Util.classDescOfName(name);
 
+        if (Util.classDescEquals(cd, ConstantDescs.CD_Enum)) {
+            return SerializedSpecialSerializableClass.ENUM;
+        }
         if (isEnum) {
-            return new SerializedEnumClass(cd, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid);
+            SerializedClass enumSuper = superDesc instanceof SerializedClass sc ? sc : null;
+            return new SerializedEnumClass(cd, classLoader, uid, enumSuper);
         } else if (isExternalizable) {
             if ((flags & SC_BLOCK_DATA) == 0) {
                 throw new StreamCorruptedException(
                         "Pre-1.2 externalizable stream (SC_BLOCK_DATA not set) cannot be structurally parsed");
             }
             SerializedClass extSuper = superDesc instanceof SerializedClass sc ? sc : null;
-            return new SerializedExternalizableClass(cd, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid, extSuper);
+            return new SerializedExternalizableClass(cd, classLoader, uid, extSuper);
         } else if (isSerializable) {
             if (name.startsWith("[")) {
-                // array class descriptor
-                return buildArrayClassDesc(cd, uid);
+                ClassDesc componentDesc = cd.componentType();
+                return new SerializedArrayClass(cd, classLoader, uid,
+                        buildComponentTypeDesc(componentDesc, classLoader));
             }
-            // serializable class (also covers records at the wire level)
             SerializedSerializableClass.Builder builder = SerializedSerializableClass.builder()
                     .classDesc(cd)
-                    .classLoader(SerializedKnownClassLoader.forUnspecifiedClassLoader())
+                    .classLoader(classLoader)
                     .uid(uid)
                     .hasWriteMethod((flags & SC_WRITE_METHOD) != 0);
             for (FieldDesc fd : fields) {
@@ -496,20 +494,6 @@ public final class SerialStreamReader implements SerialInput, Closeable {
     }
 
     /**
-     * Build an array class descriptor from its {@link ClassDesc}.
-     * The component type is derived from the descriptor.
-     *
-     * @param arrayDesc the class descriptor for the array type
-     * @param uid the serial version UID
-     * @return the array class descriptor (not {@code null})
-     */
-    private SerializedArrayClass buildArrayClassDesc(ClassDesc arrayDesc, long uid) throws IOException {
-        ClassDesc componentDesc = arrayDesc.componentType();
-        return new SerializedArrayClass(arrayDesc, SerializedKnownClassLoader.forUnspecifiedClassLoader(), uid,
-                buildComponentTypeDesc(componentDesc));
-    }
-
-    /**
      * Build a minimal class descriptor for the component type of an array.
      * <p>
      * Primitives are represented by the appropriate {@link SerializedPrimitiveClass} singleton.
@@ -517,20 +501,20 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * with no fields.
      *
      * @param componentDesc the component type class descriptor (must not be {@code null})
+     * @param classLoader the class loader to use for the component type (not {@code null})
      * @return a class descriptor for the component type (not {@code null})
      */
-    private SerializedClass buildComponentTypeDesc(ClassDesc componentDesc) throws IOException {
+    private SerializedClass buildComponentTypeDesc(ClassDesc componentDesc, Serialized classLoader) {
         if (componentDesc.isPrimitive()) {
             return SerializedPrimitiveClass.of(componentDesc);
         }
         if (componentDesc.isArray()) {
-            return new SerializedArrayClass(componentDesc, SerializedKnownClassLoader.forUnspecifiedClassLoader(), 0,
-                    buildComponentTypeDesc(componentDesc.componentType()));
+            return new SerializedArrayClass(componentDesc, classLoader, 0,
+                    buildComponentTypeDesc(componentDesc.componentType(), classLoader));
         }
-        // object: create a minimal placeholder
         return SerializedSerializableClass.builder()
                 .classDesc(componentDesc)
-                .classLoader(SerializedKnownClassLoader.forUnspecifiedClassLoader())
+                .classLoader(classLoader)
                 .uid(0)
                 .build();
     }
@@ -551,38 +535,42 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             ifaceNames.add(readRawUTF());
         }
 
-        readClassAnnotation();
+        Serialized classLoader = readClassAnnotation();
 
         // superclass descriptor (typically java.lang.reflect.Proxy)
         Serialized rawSuperDesc = readClassDescOrRef();
         SerializedClass proxySuperClass = rawSuperDesc instanceof SerializedClass sc ? sc : null;
 
-        SerializedProxyClass proxyClass = new SerializedProxyClass(ifaceNames,
-                SerializedKnownClassLoader.forUnspecifiedClassLoader(), proxySuperClass);
+        SerializedProxyClass proxyClass = new SerializedProxyClass(ifaceNames, classLoader, proxySuperClass);
         handles.set(handleIndex, proxyClass);
         return proxyClass;
     }
 
     /**
-     * Read and skip (or delegate to the callback) the class annotation data,
-     * terminated by {@code TC_ENDBLOCKDATA}.
+     * Read the class annotation data and return the class loader to use for the
+     * class descriptor being constructed.
      * <p>
      * When a {@link ClassAnnotationReader} callback is configured, block data mode
      * is entered before invoking the callback so that the callback can use this
      * reader's {@link SerialInput} methods ({@link #readInt()}, {@link #readSerialized()},
      * etc.) to consume annotation data. After the callback returns, any unconsumed
      * annotation data is skipped up to and including the {@code TC_ENDBLOCKDATA} marker.
+     * <p>
+     * If no callback is configured, or the callback returns {@code null}, the
+     * unspecified class loader constant is returned.
      *
+     * @return the class loader representation for the class descriptor (not {@code null})
      * @throws IOException if an I/O error or protocol error occurs
      */
-    private void readClassAnnotation() throws IOException {
+    private Serialized readClassAnnotation() throws IOException {
+        Serialized classLoader = null;
         if (classAnnotationReader != null) {
             blockDataMode = true;
             blockDataRemaining = 0;
             endOfBlockData = false;
             peekTC = -1;
             try {
-                classAnnotationReader.read(this);
+                classLoader = classAnnotationReader.read(this);
             } finally {
                 blockDataMode = false;
             }
@@ -592,6 +580,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         }
         endOfBlockData = false;
         peekTC = -1;
+        return classLoader != null ? classLoader : SerializedKnownClassLoader.forUnspecifiedClassLoader();
     }
 
     /**
@@ -667,7 +656,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * @return the serialized object node (not {@code null})
      */
     private Serialized readSerializableObject(SerializedSerializableClass serClass) throws IOException {
-        return new SerializedSerializable(serClass, this::assignHandle, () -> {
+        return new SerializedSerializable(serClass, handles::add, () -> {
             // walk the superclass chain and read per-level data from root to leaf
             List<SerialData> levels = new ArrayList<>();
             collectClassLevels(serClass, levels);
@@ -687,9 +676,14 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         for (SerializedSerializableClass c = classDesc; c != null; c = c.superClass()) {
             chain.add(c);
         }
-        // read from root (last in chain) to leaf (first in chain)
+        // read from root (last in chain) to leaf (first in chain),
+        // skipping levels that have no fields and no write method (nothing in the stream)
         for (int i = chain.size() - 1; i >= 0; i--) {
-            levels.add(readClassLevelData(chain.get(i)));
+            SerializedSerializableClass c = chain.get(i);
+            if (c.primitiveBufferSize() == 0 && c.objectBufferSize() == 0 && !c.hasWriteMethod()) {
+                continue;
+            }
+            levels.add(readClassLevelData(c));
         }
     }
 
@@ -739,7 +733,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      * @return the deserialized externalizable node (not {@code null})
      */
     private Serialized readExternalizableObject(SerializedExternalizableClass extClass) throws IOException {
-        return new SerializedExternalizable(extClass, this::assignHandle, this::readAnnotationContent);
+        return new SerializedExternalizable(extClass, handles::add, this::readAnnotationContent);
     }
 
     /**
@@ -752,7 +746,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
      */
     private Serialized readProxyObject(SerializedProxyClass proxyClass) throws IOException {
         // proxy data: Proxy super's one object field (invocation handler)
-        return new SerializedProxyObject(proxyClass, this::assignHandle, this::readObject0);
+        return new SerializedProxyObject(proxyClass, handles::add, this::readObject0);
     }
 
     // ---- Enum reading ----
@@ -767,7 +761,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
         if (!(classDescNode instanceof SerializedEnumClass enumClass)) {
             throw new StreamCorruptedException("TC_ENUM class descriptor is not an enum class");
         }
-        return new SerializedEnum(enumClass, this::assignHandle, this::readObject0);
+        return new SerializedEnum(enumClass, handles::add, this::readObject0);
     }
 
     // ---- Array reading ----
@@ -792,7 +786,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
             throw new InvalidObjectException("array size exceeds limit: " + Integer.toUnsignedLong(length));
         }
 
-        char componentCode = arrayClass.classDesc().componentType().descriptorString().charAt(0);
+        char componentCode = arrayClass.descriptor().componentType().descriptorString().charAt(0);
 
         Serialized result = switch (componentCode) {
             case 'Z' -> readBooleanArray(arrayClass, length);
@@ -953,7 +947,7 @@ public final class SerialStreamReader implements SerialInput, Closeable {
     private Serialized readClassValue() throws IOException {
         Serialized classDesc = readClassDescOrRef();
         // assign handle for the Class *value* (distinct from the class descriptor handle)
-        assignHandle(classDesc);
+        handles.add(classDesc);
         return classDesc;
     }
 

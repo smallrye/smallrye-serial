@@ -7,7 +7,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UTFDataFormatException;
-import java.lang.constant.ConstantDescs;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,7 +27,6 @@ import io.smallrye.serial.SerializedExternalizableClass;
 import io.smallrye.serial.SerializedFieldedClass;
 import io.smallrye.serial.SerializedFloatArray;
 import io.smallrye.serial.SerializedIntArray;
-import io.smallrye.serial.SerializedKnownClassLoader;
 import io.smallrye.serial.SerializedLongArray;
 import io.smallrye.serial.SerializedNull;
 import io.smallrye.serial.SerializedObjectArray;
@@ -39,10 +37,12 @@ import io.smallrye.serial.SerializedRecordClass;
 import io.smallrye.serial.SerializedSerializable;
 import io.smallrye.serial.SerializedSerializableClass;
 import io.smallrye.serial.SerializedShortArray;
+import io.smallrye.serial.SerializedSpecialSerializableClass;
 import io.smallrye.serial.SerializedString;
 import io.smallrye.serial.StreamData;
 import io.smallrye.serial.impl.IntMap;
 import io.smallrye.serial.impl.ModifiedUtf8;
+import io.smallrye.serial.impl.ModifiedUtf8Codec;
 import io.smallrye.serial.impl.Util;
 
 /**
@@ -89,9 +89,6 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
     private final byte[] blockBuf = new byte[BLOCK_BUF_SIZE];
     private int blockPos;
     private boolean blockDataMode;
-
-    // Lazily created synthetic class descriptor for enum superclass
-    private SerializedEnumClass enumSuperDesc;
 
     // ---- Builder ----
 
@@ -303,19 +300,16 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             throw new UTFDataFormatException("String too long for writeUTF: " + utfLen + " bytes");
         }
         writeShort((int) utfLen);
-        // encode character-by-character directly through the block-data buffer;
-        // no intermediate byte[] needed since write(int) already buffers into blockBuf
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c > 0 && c <= 0x7f) {
-                write(c);
-            } else if (c <= 0x7ff) {
-                write(0xc0 | 0x1f & c >> 6);
-                write(0x80 | 0x3f & c);
-            } else {
-                write(0xe0 | 0x0f & c >> 12);
-                write(0x80 | 0x3f & c >> 6);
-                write(0x80 | 0x3f & c);
+            switch (ModifiedUtf8Codec.encodedLength(c)) {
+                case 1 -> write(c);
+                case 2 -> writeShort(ModifiedUtf8Codec.encode2(c));
+                case 3 -> {
+                    int v = ModifiedUtf8Codec.encode3(c);
+                    write(v >>> 16);
+                    writeShort(v);
+                }
             }
         }
     }
@@ -447,15 +441,14 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
     private void rawEncodeUtf(String s) throws IOException {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c > 0 && c <= 0x7f) {
-                rawWriteByte(c);
-            } else if (c <= 0x7ff) {
-                rawWriteByte(0xc0 | 0x1f & c >> 6);
-                rawWriteByte(0x80 | 0x3f & c);
-            } else {
-                rawWriteByte(0xe0 | 0x0f & c >> 12);
-                rawWriteByte(0x80 | 0x3f & c >> 6);
-                rawWriteByte(0x80 | 0x3f & c);
+            switch (ModifiedUtf8Codec.encodedLength(c)) {
+                case 1 -> rawWriteByte(c);
+                case 2 -> rawWriteShort(ModifiedUtf8Codec.encode2(c));
+                case 3 -> {
+                    int v = ModifiedUtf8Codec.encode3(c);
+                    rawWriteByte(v >>> 16);
+                    rawWriteShort(v);
+                }
             }
         }
     }
@@ -471,6 +464,20 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             rawFlush();
         }
         blockBuf[blockPos++] = (byte) b;
+    }
+
+    /**
+     * Buffer two bytes for a raw (non-block-data) write in big-endian order,
+     * draining to {@code out} with no header when the buffer is full.
+     * Must only be called on the structural path (i.e. when {@code !blockDataMode}).
+     */
+    private void rawWriteShort(int v) throws IOException {
+        assert !blockDataMode;
+        if (blockPos + 2 > BLOCK_BUF_SIZE) {
+            rawFlush();
+        }
+        Util.BE16.set(blockBuf, blockPos, (short) v);
+        blockPos += 2;
     }
 
     /**
@@ -558,11 +565,14 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             out.writeByte(SC_SERIALIZABLE | SC_ENUM);
             out.writeShort(0); // no fields
             writeClassAnnotation(c);
-            if (Util.classDescEquals(c.classDesc(), ConstantDescs.CD_Enum)) {
-                out.writeByte(TC_NULL);
-            } else {
-                writeClassDesc(getEnumSuperDesc());
-            }
+            writeClassDesc(c.superClass());
+        } else if (classDesc == SerializedSpecialSerializableClass.ENUM) {
+            writeRawUTF(classDesc.name());
+            out.writeLong(SerializedSpecialSerializableClass.ENUM.serialVersionUID());
+            out.writeByte(SC_SERIALIZABLE | SC_ENUM);
+            out.writeShort(0); // no fields
+            writeClassAnnotation(classDesc);
+            out.writeByte(TC_NULL);
         } else {
             throw new IOException(
                     "Cannot write class descriptor for " + classDesc.getClass().getName()
@@ -953,17 +963,16 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
      * Assign a new handle to the given Serialized node.
      *
      * @param s the Serialized node to assign a handle to (not {@code null})
-     * @return the assigned handle number
      */
-    private int assignHandle(Serialized s) {
-        int h = nextHandle++;
-        handles.put(s, h);
-        return h;
+    private void assignHandle(Serialized s) {
+        handles.put(s, nextHandle++);
     }
 
     /**
-     * If the given Serialized node has already been written, emit TC_REFERENCE
-     * and return {@code true}. Otherwise return {@code false}.
+     * {@return code {@code true} if the given Serialized node has already been written (also emits TC_REFERENCE);
+     * otherwise {@code false}}
+     *
+     * @param s the Serialized node to reference (not {@code null})
      */
     private boolean writeReferenceIfSeen(Serialized s) throws IOException {
         if (handles.containsKey(s)) {
@@ -972,21 +981,6 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
             return true;
         }
         return false;
-    }
-
-    // ---- Synthetic superclass descriptors ----
-
-    /**
-     * {@return the synthetic class descriptor for {@code java.lang.Enum}, lazily created}
-     * Used as the superclass descriptor for enum type class descriptors.
-     */
-    private SerializedEnumClass getEnumSuperDesc() {
-        SerializedEnumClass desc = enumSuperDesc;
-        if (desc == null) {
-            desc = new SerializedEnumClass(ConstantDescs.CD_Enum, SerializedKnownClassLoader.forBootClassLoader(), 0L);
-            enumSuperDesc = desc;
-        }
-        return desc;
     }
 
 }

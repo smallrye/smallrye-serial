@@ -21,6 +21,13 @@ public final class SerializedDoubleArray extends SerializedArray {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public int length() {
+        return array.length;
+    }
+
+    /**
      * {@return the array corresponding to this serialized representation (not {@code null})}
      */
     public double[] asArray() {

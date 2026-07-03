@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.EOFException;
 import java.io.Externalizable;
 import java.io.IOException;
-import java.io.NotActiveException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.List;
@@ -290,12 +289,14 @@ class CapturedObjectInputTest {
 
     /**
      * Attempting to read an object when the next block is {@link StreamData.OfBytes}
-     * throws {@link NotActiveException}.
+     * throws {@link java.io.OptionalDataException} with {@code eof = false}.
      */
     @Test
     void readObjectAtBytesPositionThrows() {
         var input = new CapturedObjectInput(null, List.of(StreamData.of(new byte[] { 0, 0, 0, 0 })));
-        assertThrows(NotActiveException.class, input::readObject);
+        var e = assertThrows(java.io.OptionalDataException.class, input::readObject);
+        assertFalse(e.eof);
+        assertEquals(4, e.length);
     }
 
     // ---- UTF reading ----

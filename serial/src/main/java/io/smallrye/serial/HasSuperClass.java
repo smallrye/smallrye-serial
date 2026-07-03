@@ -22,7 +22,7 @@ package io.smallrye.serial;
  * @see SerializedProxyClass#superClass()
  */
 public sealed interface HasSuperClass
-        permits SerializedSerializableClass, SerializedExternalizableClass, SerializedProxyClass {
+        permits SerializedEnumClass, SerializedSerializableClass, SerializedExternalizableClass, SerializedProxyClass {
 
     /**
      * {@return the superclass descriptor in the serialization hierarchy, or {@code null}
