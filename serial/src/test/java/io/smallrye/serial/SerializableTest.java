@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 class SerializableTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * A simple serializable point with two int fields.
@@ -101,9 +103,9 @@ class SerializableTest {
     @Test
     void simpleSerializableRoundTrip() throws IOException, ClassNotFoundException {
         SimplePoint original = new SimplePoint(42, -7);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedSerializable.class, serialized);
-        SimplePoint result = (SimplePoint) ctx.deserialize(serialized);
+        SimplePoint result = (SimplePoint) des.deserialize(serialized);
         assertEquals(original.x, result.x);
         assertEquals(original.y, result.y);
     }
@@ -111,12 +113,12 @@ class SerializableTest {
     @Test
     void inheritanceRoundTrip() throws IOException, ClassNotFoundException {
         NamedPoint original = new NamedPoint(1, 2, "origin");
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedSerializable.class, serialized);
         SerializedSerializable ss = (SerializedSerializable) serialized;
         assertEquals(2, ss.data().size(), "expected two levels: SimplePoint + NamedPoint");
         assertNotNull(ss.serializedClass().superClass(), "NamedPoint should have a superclass descriptor");
-        NamedPoint result = (NamedPoint) ctx.deserialize(serialized);
+        NamedPoint result = (NamedPoint) des.deserialize(serialized);
         assertEquals(original.x, result.x);
         assertEquals(original.y, result.y);
         assertEquals(original.name, result.name);
@@ -125,9 +127,9 @@ class SerializableTest {
     @Test
     void customWriteObjectRoundTrip() throws IOException, ClassNotFoundException {
         CustomWriteObject original = new CustomWriteObject(100, 200);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedSerializable.class, serialized);
-        CustomWriteObject result = (CustomWriteObject) ctx.deserialize(serialized);
+        CustomWriteObject result = (CustomWriteObject) des.deserialize(serialized);
         assertEquals(original.value, result.value);
         assertEquals(original.extra, result.extra);
     }
@@ -135,16 +137,16 @@ class SerializableTest {
     @Test
     void nullFieldRoundTrip() throws IOException, ClassNotFoundException {
         NullableField original = new NullableField(null);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedSerializable.class, serialized);
-        NullableField result = (NullableField) ctx.deserialize(serialized);
+        NullableField result = (NullableField) des.deserialize(serialized);
         assertNull(result.label);
     }
 
     @Test
     void checkIntermediateStructure() throws IOException {
         SimplePoint original = new SimplePoint(5, 10);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         SerializedSerializable ss = (SerializedSerializable) serialized;
         SerializedSerializableClass sc = ss.serializedClass();
         assertInstanceOf(SerializedSerializableClass.class, sc);

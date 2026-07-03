@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 class WriteReplaceReadResolveTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * A serializable class whose {@code writeReplace} method substitutes a {@link Replacement}.
@@ -70,13 +72,13 @@ class WriteReplaceReadResolveTest {
     @Test
     void writeReplaceRoundTrip() throws IOException, ClassNotFoundException {
         Replaceable original = new Replaceable(99);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         // the intermediate should be for Replacement, not Replaceable
         assertInstanceOf(SerializedSerializable.class, serialized);
         SerializedSerializable ss = (SerializedSerializable) serialized;
         assertEquals(Replacement.class.getName(), ss.serializedClass().name());
 
-        Object result = ctx.deserialize(serialized);
+        Object result = des.deserialize(serialized);
         assertInstanceOf(Resolved.class, result);
         assertEquals(99, ((Resolved) result).value);
     }

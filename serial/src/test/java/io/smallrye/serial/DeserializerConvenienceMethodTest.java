@@ -15,37 +15,39 @@ import org.junit.jupiter.api.Test;
 class DeserializerConvenienceMethodTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     @Test
     void deserializeWithType() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize("hello");
-        String result = ctx.deserialize(serialized, String.class);
+        Serialized serialized = ser.serialize("hello");
+        String result = des.deserialize(serialized, String.class);
         assertEquals("hello", result);
     }
 
     @Test
     void deserializeWithWrongTypeThrows() throws IOException {
-        Serialized serialized = ctx.serialize("hello");
-        assertThrows(ClassCastException.class, () -> ctx.deserialize(serialized, Integer.class));
+        Serialized serialized = ser.serialize("hello");
+        assertThrows(ClassCastException.class, () -> des.deserialize(serialized, Integer.class));
     }
 
     @Test
     void deserializeClass() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize(String.class);
-        Class<?> result = ctx.deserializeClass(serialized);
+        Serialized serialized = ser.serialize(String.class);
+        Class<?> result = des.deserializeClass(serialized);
         assertSame(String.class, result);
     }
 
     @Test
     void deserializeClassWithBound() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize(Integer.class);
-        Class<? extends Number> result = ctx.deserializeClass(serialized, Number.class);
+        Serialized serialized = ser.serialize(Integer.class);
+        Class<? extends Number> result = des.deserializeClass(serialized, Number.class);
         assertSame(Integer.class, result);
     }
 
     @Test
     void deserializeClassWithWrongBoundThrows() throws IOException {
-        Serialized serialized = ctx.serialize(Integer.class);
-        assertThrows(ClassCastException.class, () -> ctx.deserializeClass(serialized, String.class));
+        Serialized serialized = ser.serialize(Integer.class);
+        assertThrows(ClassCastException.class, () -> des.deserializeClass(serialized, String.class));
     }
 }

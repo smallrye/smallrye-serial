@@ -3,8 +3,8 @@ package io.smallrye.serial.spi;
 import java.io.IOException;
 
 import io.smallrye.serial.Deserializer;
-import io.smallrye.serial.SerialContext;
 import io.smallrye.serial.Serialized;
+import io.smallrye.serial.impl.DeserializerContextImpl;
 
 /**
  * An object deserializer is responsible for creating and initializing an object from a serialized representation.
@@ -26,7 +26,7 @@ public non-sealed interface ObjectDeserializer extends Prioritized {
     /**
      * The context for an object deserializer.
      */
-    sealed interface Context extends Deserializer permits SerialContext.DeserializerContextImpl {
+    sealed interface Context extends Deserializer permits DeserializerContextImpl {
         /**
          * Set or replace the value of the object being deserialized, even if deserialization
          * is not yet complete.

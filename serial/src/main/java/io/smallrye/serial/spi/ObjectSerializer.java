@@ -2,9 +2,9 @@ package io.smallrye.serial.spi;
 
 import java.io.IOException;
 
-import io.smallrye.serial.SerialContext;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.Serializer;
+import io.smallrye.serial.impl.SerializerContextImpl;
 
 /**
  * An object serializer is responsible for performing serialization on some specific kind of object.
@@ -25,7 +25,7 @@ public non-sealed interface ObjectSerializer extends Prioritized {
     /**
      * The context for an object serializer.
      */
-    sealed interface Context extends Serializer permits SerialContext.SerializerContextImpl {
+    sealed interface Context extends Serializer permits SerializerContextImpl {
 
         /**
          * Set or replace the serialized representation of the object currently being serialized, even if serialization

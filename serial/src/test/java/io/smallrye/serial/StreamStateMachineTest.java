@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 class StreamStateMachineTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     // ---- No-field classes with custom writeObject (TreeSet/TreeMap pattern) ----
 
@@ -72,7 +74,7 @@ class StreamStateMachineTest {
     @Test
     void noFieldsObjectsBytesObjectsRoundTrip() throws Exception {
         var original = new NoFieldsObjBytesObj("natural", "apple", "banana", "cherry");
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var data = ss.data();
         assertEquals(1, data.size());
@@ -92,7 +94,7 @@ class StreamStateMachineTest {
         // Verify the byte block contains the correct size
         assertEquals(3, ((StreamData.OfBytes) streamData.get(1)).getInt(0));
 
-        var result = (NoFieldsObjBytesObj) ctx.deserialize(serialized);
+        var result = (NoFieldsObjBytesObj) des.deserialize(serialized);
         assertEquals("natural", result.comparator);
         assertEquals(3, result.size);
         assertArrayEquals(new String[] { "apple", "banana", "cherry" }, result.elements);
@@ -104,7 +106,7 @@ class StreamStateMachineTest {
     @Test
     void noFieldsObjectsBytesNoElements() throws Exception {
         var original = new NoFieldsObjBytesObj("natural");
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var streamData = ss.data().get(0).streamData();
 
@@ -114,7 +116,7 @@ class StreamStateMachineTest {
         assertInstanceOf(StreamData.OfBytes.class, streamData.get(1));
         assertEquals(0, ((StreamData.OfBytes) streamData.get(1)).getInt(0));
 
-        var result = (NoFieldsObjBytesObj) ctx.deserialize(serialized);
+        var result = (NoFieldsObjBytesObj) des.deserialize(serialized);
         assertEquals("natural", result.comparator);
         assertEquals(0, result.size);
         assertEquals(0, result.elements.length);
@@ -126,8 +128,8 @@ class StreamStateMachineTest {
     @Test
     void noFieldsNullComparator() throws Exception {
         var original = new NoFieldsObjBytesObj(null, "x", "y");
-        Serialized serialized = ctx.serialize(original);
-        var result = (NoFieldsObjBytesObj) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        var result = (NoFieldsObjBytesObj) des.deserialize(serialized);
         assertNull(result.comparator);
         assertEquals(2, result.size);
         assertArrayEquals(new String[] { "x", "y" }, result.elements);
@@ -170,7 +172,7 @@ class StreamStateMachineTest {
     @Test
     void fieldsAndBytesStreamData() throws Exception {
         var original = new FieldsAndBytes(10, 20);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var serialData = ss.data().get(0);
 
@@ -183,7 +185,7 @@ class StreamStateMachineTest {
         var bytes = assertInstanceOf(StreamData.OfBytes.class, streamData.get(0));
         assertEquals(20, bytes.getInt(0));
 
-        var result = (FieldsAndBytes) ctx.deserialize(serialized);
+        var result = (FieldsAndBytes) des.deserialize(serialized);
         assertEquals(10, result.value);
         assertEquals(20, result.extra);
     }
@@ -228,7 +230,7 @@ class StreamStateMachineTest {
     @Test
     void fieldsAndMixedStreamData() throws Exception {
         var original = new FieldsAndMixedStream(1, "test", "extra-tag", 42);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var serialData = ss.data().get(0);
 
@@ -243,7 +245,7 @@ class StreamStateMachineTest {
         assertInstanceOf(StreamData.OfBytes.class, streamData.get(1));
         assertEquals(42, ((StreamData.OfBytes) streamData.get(1)).getInt(0));
 
-        var result = (FieldsAndMixedStream) ctx.deserialize(serialized);
+        var result = (FieldsAndMixedStream) des.deserialize(serialized);
         assertEquals(1, result.id);
         assertEquals("test", result.name);
         assertEquals("extra-tag", result.tag);
@@ -284,14 +286,14 @@ class StreamStateMachineTest {
     @Test
     void defaultOnlyProducesNoStreamData() throws Exception {
         var original = new DefaultOnly(5, 10);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var serialData = ss.data().get(0);
 
         assertFalse(serialData.primitiveFieldData().isEmpty());
         assertTrue(serialData.streamData().isEmpty());
 
-        var result = (DefaultOnly) ctx.deserialize(serialized);
+        var result = (DefaultOnly) des.deserialize(serialized);
         assertEquals(5, result.x);
         assertEquals(10, result.y);
     }
@@ -324,7 +326,7 @@ class StreamStateMachineTest {
     @Test
     void noFieldsDefaultOnlyRoundTrip() throws Exception {
         var original = new NoFieldsDefaultOnly();
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var serialData = ss.data().get(0);
 
@@ -332,7 +334,7 @@ class StreamStateMachineTest {
         assertTrue(serialData.objectFieldData().isEmpty());
         assertTrue(serialData.streamData().isEmpty());
 
-        var result = assertInstanceOf(NoFieldsDefaultOnly.class, ctx.deserialize(serialized));
+        var result = assertInstanceOf(NoFieldsDefaultOnly.class, des.deserialize(serialized));
         assertNotNull(result);
     }
 
@@ -375,7 +377,7 @@ class StreamStateMachineTest {
     @Test
     void noFieldsBytesOnlyStreamData() throws Exception {
         var original = new NoFieldsBytesOnly(99, Long.MAX_VALUE);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var streamData = ss.data().get(0).streamData();
 
@@ -384,7 +386,7 @@ class StreamStateMachineTest {
         assertEquals(99, bytes.getInt(0));
         assertEquals(Long.MAX_VALUE, bytes.getLong(4));
 
-        var result = (NoFieldsBytesOnly) ctx.deserialize(serialized);
+        var result = (NoFieldsBytesOnly) des.deserialize(serialized);
         assertEquals(99, result.a);
         assertEquals(Long.MAX_VALUE, result.b);
     }
@@ -459,7 +461,7 @@ class StreamStateMachineTest {
     @Test
     void superclassChainMixedPatterns() throws Exception {
         var original = new Sub(1, 2, "subval", "tag", 77);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ss = assertInstanceOf(SerializedSerializable.class, serialized);
         var allData = ss.data();
         assertEquals(2, allData.size());
@@ -481,7 +483,7 @@ class StreamStateMachineTest {
         assertInstanceOf(StreamData.OfBytes.class, subStream.get(1));
         assertEquals(77, ((StreamData.OfBytes) subStream.get(1)).getInt(0));
 
-        var result = (Sub) ctx.deserialize(serialized);
+        var result = (Sub) des.deserialize(serialized);
         assertEquals(1, result.baseField);
         assertEquals(2, result.baseExtra);
         assertEquals("subval", result.subField);

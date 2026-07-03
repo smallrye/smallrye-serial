@@ -1,17 +1,12 @@
 package io.smallrye.serial;
 
-import java.io.IOException;
-import java.io.NotSerializableException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.ServiceLoader;
 
 import io.smallrye.common.constraint.Assert;
-import io.smallrye.serial.impl.ClassLocal;
+import io.smallrye.serial.impl.SerialContextImpl;
 import io.smallrye.serial.impl.providers.ArrayDeserializer;
 import io.smallrye.serial.impl.providers.ArraySerializer;
 import io.smallrye.serial.impl.providers.ClassDeserializer;
@@ -37,204 +32,51 @@ import io.smallrye.serial.spi.ObjectSerializer;
 import io.smallrye.serial.spi.Prioritized;
 
 /**
- * The main context for serialization and deserialization operations.
+ * A configured serialization context that holds the set of serialization and
+ * deserialization providers.
  * <p>
- * A serial context maintains identity maps for both directions (object→serialized and serialized→object)
- * to correctly handle circular references. Providers are tried in priority order (highest first) using
- * a chain-of-responsibility pattern.
+ * A serial context is thread-safe and may be shared across threads.
+ * Individual {@link Serializer} and {@link Deserializer} instances created
+ * from this context are not thread-safe and should be used from a single thread
+ * (or with external synchronization).
  * <p>
  * Use {@link #builder()} to create and configure a new instance.
  */
-public final class SerialContext implements Serializer, Deserializer {
-    private final IdentityHashMap<Object, Serialized> serializedObjects = new IdentityHashMap<>();
-    private final IdentityHashMap<Serialized, Object> deserializedObjects = new IdentityHashMap<>();
-    private final IdentityHashMap<ClassLocal<?>, Map<Class<?>, Object>> classLocalCache = new IdentityHashMap<>();
-    private final List<ObjectSerializer> serializers;
-    private final List<ObjectDeserializer> deserializers;
-
-    private SerialContext(final List<ObjectSerializer> serializers, final List<ObjectDeserializer> deserializers) {
-        this.serializers = serializers;
-        this.deserializers = deserializers;
-    }
+public sealed interface SerialContext permits SerialContextImpl {
 
     /**
      * {@return a new builder for configuring a serial context}
      */
-    public static Builder builder() {
+    static Builder builder() {
         return new Builder();
     }
 
-    public Object deserialize(final Serialized serialized) throws IOException, ClassNotFoundException {
-        synchronized (deserializedObjects) {
-            Assert.checkNotNullParam("serialized", serialized);
-            if (serialized instanceof SerializedNull) {
-                return null;
-            }
-            if (deserializedObjects.containsKey(serialized)) {
-                return deserializedObjects.get(serialized);
-            }
-            Object obj = new DeserializerContextImpl(serialized).next();
-            deserializedObjects.put(serialized, obj);
-            return obj;
-        }
-    }
-
-    public boolean hasDeserialized(final Serialized serialized) {
-        synchronized (deserializedObjects) {
-            return deserializedObjects.containsKey(serialized);
-        }
-    }
-
-    public Serialized serialize(final Object object) throws IOException {
-        synchronized (serializedObjects) {
-            if (object == null) {
-                return SerializedNull.INSTANCE;
-            }
-            Serialized serialized = serializedObjects.get(object);
-            if (serialized != null) {
-                return serialized;
-            }
-            serialized = new SerializerContextImpl(object).next();
-            serializedObjects.put(object, serialized);
-            return serialized;
-        }
-    }
-
-    public boolean hasSerialized(final Object object) {
-        synchronized (serializedObjects) {
-            return object == null || serializedObjects.containsKey(object);
-        }
-    }
-
     /**
-     * Compute and cache a per-class value for the lifetime of this context.
+     * Create a new serializer that uses this context's configured providers.
+     * The returned serializer maintains its own identity map for tracking
+     * previously serialized objects.
      *
-     * @param local the class local key (must not be {@code null})
-     * @param type the class to compute data for (must not be {@code null})
-     * @param <T> the type of the cached value
-     * @return the computed or cached value
+     * @return a new serializer (not {@code null})
      */
-    @SuppressWarnings("unchecked")
-    <T> T classLocal(ClassLocal<T> local, Class<?> type) {
-        return (T) classLocalCache
-                .computeIfAbsent(local, k -> new HashMap<>())
-                .computeIfAbsent(type, local.compute());
-    }
+    Serializer createSerializer();
 
     /**
-     * The deserialization context implementation, providing chain-of-responsibility
-     * delegation and identity map management for a single deserialization operation.
+     * Create a new deserializer that uses this context's configured providers.
+     * The returned deserializer maintains its own identity map for tracking
+     * previously deserialized objects.
+     *
+     * @return a new deserializer (not {@code null})
      */
-    public final class DeserializerContextImpl implements ObjectDeserializer.Context {
-        private final Serialized serialized;
-        /**
-         * The index of the deserializer that will be called when {@code next()} is called.
-         */
-        private int current;
-
-        private DeserializerContextImpl(final Serialized serialized) {
-            this.serialized = serialized;
-        }
-
-        public void preSetObject(final Object obj) {
-            deserializedObjects.put(serialized, obj);
-        }
-
-        public Object next() throws IOException, ClassNotFoundException {
-            if (current == deserializers.size()) {
-                throw new NotSerializableException("No deserializer available for " + serialized.getClass().getName());
-            }
-            try {
-                Object instance = deserializers.get(current++).deserialize(this, serialized);
-                preSetObject(instance);
-                return instance;
-            } finally {
-                current--;
-            }
-        }
-
-        public Object deserialize(final Serialized serialized) throws IOException, ClassNotFoundException {
-            return SerialContext.this.deserialize(serialized);
-        }
-
-        public boolean hasDeserialized(final Serialized serialized) {
-            return SerialContext.this.hasDeserialized(serialized);
-        }
-
-        /**
-         * Compute and cache a per-class value for the lifetime of the enclosing context.
-         *
-         * @param local the class local key (must not be {@code null})
-         * @param type the class to compute data for (must not be {@code null})
-         * @param <T> the type of the cached value
-         * @return the computed or cached value
-         */
-        public <T> T classLocal(ClassLocal<T> local, Class<?> type) {
-            return SerialContext.this.classLocal(local, type);
-        }
-    }
-
-    /**
-     * The serialization context implementation, providing chain-of-responsibility
-     * delegation and identity map management for a single serialization operation.
-     */
-    public final class SerializerContextImpl implements ObjectSerializer.Context {
-        private final Object deserialized;
-        /**
-         * The index of the serializer that will be called when {@code next()} is called.
-         */
-        private int current;
-
-        private SerializerContextImpl(final Object deserialized) {
-            this.deserialized = deserialized;
-        }
-
-        public void preSetSerialized(final Serialized serialized) {
-            serializedObjects.put(deserialized, serialized);
-        }
-
-        public Serialized next() throws IOException {
-            if (current == serializers.size()) {
-                throw new NotSerializableException(deserialized.getClass().getName());
-            }
-            try {
-                Serialized serialized = serializers.get(current++).serialize(this, deserialized);
-                preSetSerialized(serialized);
-                return serialized;
-            } finally {
-                current--;
-            }
-        }
-
-        public Serialized serialize(final Object object) throws IOException {
-            return SerialContext.this.serialize(object);
-        }
-
-        public boolean hasSerialized(final Object object) {
-            return SerialContext.this.hasSerialized(object);
-        }
-
-        /**
-         * Compute and cache a per-class value for the lifetime of the enclosing context.
-         *
-         * @param local the class local key (must not be {@code null})
-         * @param type the class to compute data for (must not be {@code null})
-         * @param <T> the type of the cached value
-         * @return the computed or cached value
-         */
-        <T> T classLocal(ClassLocal<T> local, Class<?> type) {
-            return SerialContext.this.classLocal(local, type);
-        }
-    }
+    Deserializer createDeserializer();
 
     /**
      * A builder for configuring and creating {@link SerialContext} instances.
      */
-    public static final class Builder {
+    final class Builder {
         private final List<ObjectSerializer> serializers = new ArrayList<>();
         private final List<ObjectDeserializer> deserializers = new ArrayList<>();
 
-        private Builder() {
+        Builder() {
         }
 
         /**
@@ -317,7 +159,7 @@ public final class SerialContext implements Serializer, Deserializer {
             sortedSerializers.sort(Comparator.comparingInt(Prioritized::priority).reversed());
             List<ObjectDeserializer> sortedDeserializers = new ArrayList<>(deserializers);
             sortedDeserializers.sort(Comparator.comparingInt(Prioritized::priority).reversed());
-            return new SerialContext(List.copyOf(sortedSerializers), List.copyOf(sortedDeserializers));
+            return new SerialContextImpl(List.copyOf(sortedSerializers), List.copyOf(sortedDeserializers));
         }
     }
 }

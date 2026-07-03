@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 class RecordTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * A simple record with two primitive fields.
@@ -35,33 +37,33 @@ class RecordTest {
     @Test
     void simpleRecordRoundTrip() throws IOException, ClassNotFoundException {
         SimpleRecord original = new SimpleRecord(3, 4);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedRecord.class, serialized);
-        SimpleRecord result = (SimpleRecord) ctx.deserialize(serialized);
+        SimpleRecord result = (SimpleRecord) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
     @Test
     void mixedRecordRoundTrip() throws IOException, ClassNotFoundException {
         MixedRecord original = new MixedRecord("test", 42);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedRecord.class, serialized);
-        MixedRecord result = (MixedRecord) ctx.deserialize(serialized);
+        MixedRecord result = (MixedRecord) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
     @Test
     void emptyRecordRoundTrip() throws IOException, ClassNotFoundException {
         EmptyRecord original = new EmptyRecord();
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedRecord.class, serialized);
-        EmptyRecord result = (EmptyRecord) ctx.deserialize(serialized);
+        EmptyRecord result = (EmptyRecord) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
     @Test
     void checkIntermediateStructure() throws IOException {
-        Serialized serialized = ctx.serialize(new SimpleRecord(1, 2));
+        Serialized serialized = ser.serialize(new SimpleRecord(1, 2));
         SerializedRecord sr = (SerializedRecord) serialized;
         SerializedRecordClass rc = sr.recordClass();
         assertInstanceOf(SerializedRecordClass.class, rc);

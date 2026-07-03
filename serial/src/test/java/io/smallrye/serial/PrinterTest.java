@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 class PrinterTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
 
     // ---- Leaf types ----
 
@@ -56,7 +57,7 @@ class PrinterTest {
 
     @Test
     void printEnumClass() throws IOException {
-        Serialized serialized = ctx.serialize(Thread.State.class);
+        Serialized serialized = ser.serialize(Thread.State.class);
         String output = Printer.print(serialized);
         assertTrue(output.contains("#1 enum class java.lang.Thread$State"), output);
         assertTrue(output.contains("serialVersionUID:"), output);
@@ -162,7 +163,7 @@ class PrinterTest {
 
     @Test
     void printEnum() throws IOException {
-        Serialized serialized = ctx.serialize(Thread.State.NEW);
+        Serialized serialized = ser.serialize(Thread.State.NEW);
         String output = Printer.print(serialized);
         assertTrue(output.contains("enum java.lang.Thread$State"), output);
         assertTrue(output.contains("constantName: \"NEW\""), output);
@@ -234,7 +235,7 @@ class PrinterTest {
 
     @Test
     void printObjectArray() throws IOException {
-        Serialized serialized = ctx.serialize(new String[] { "a", "b" });
+        Serialized serialized = ser.serialize(new String[] { "a", "b" });
         String output = Printer.print(serialized);
         assertTrue(output.contains("java.lang.String[2]"), output);
         assertTrue(output.contains("[0] = \"a\""), output);
@@ -362,7 +363,7 @@ class PrinterTest {
         java.util.ArrayList<String> list = new java.util.ArrayList<>();
         list.add("alpha");
         list.add("beta");
-        Serialized serialized = ctx.serialize(list);
+        Serialized serialized = ser.serialize(list);
         String output = Printer.print(serialized);
         // should contain the class name, field data, and the string values
         assertTrue(output.contains("java.util.ArrayList"), output);

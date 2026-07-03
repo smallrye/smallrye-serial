@@ -17,6 +17,7 @@ import java.lang.reflect.Method;
 
 import org.junit.jupiter.api.Test;
 
+import io.smallrye.serial.Deserializer;
 import io.smallrye.serial.SerialContext;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedBooleanArray;
@@ -34,6 +35,7 @@ import io.smallrye.serial.SerializedObjectArray;
 import io.smallrye.serial.SerializedSerializable;
 import io.smallrye.serial.SerializedShortArray;
 import io.smallrye.serial.SerializedString;
+import io.smallrye.serial.Serializer;
 import io.smallrye.serial.spi.ObjectDeserializer;
 
 /**
@@ -65,6 +67,8 @@ class SerialStreamRoundTripTest {
                 }
             })
             .build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     // ---- Test fixtures ----
 
@@ -229,7 +233,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerSimpleSerializable() throws Exception {
         SimplePoint original = new SimplePoint(42, -7);
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         SimplePoint result = (SimplePoint) jdkDeserialize(bytes);
         assertEquals(42, result.x);
@@ -239,7 +243,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerInheritanceHierarchy() throws Exception {
         NamedPoint original = new NamedPoint(1, 2, "test");
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         NamedPoint result = (NamedPoint) jdkDeserialize(bytes);
         assertEquals(1, result.x);
@@ -250,7 +254,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerCustomWriteObject() throws Exception {
         CustomWriteObject original = new CustomWriteObject(99, "hello");
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         CustomWriteObject result = (CustomWriteObject) jdkDeserialize(bytes);
         assertEquals(99, result.value);
@@ -259,7 +263,7 @@ class SerialStreamRoundTripTest {
 
     @Test
     void writerEnum() throws Exception {
-        Serialized graph = ctx.serialize(Thread.State.RUNNABLE);
+        Serialized graph = ser.serialize(Thread.State.RUNNABLE);
         byte[] bytes = writeToBytes(graph);
         Object result = jdkDeserialize(bytes);
         assertSame(Thread.State.RUNNABLE, result);
@@ -268,7 +272,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerExternalizable() throws Exception {
         ExtPoint original = new ExtPoint(10, 20);
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         ExtPoint result = (ExtPoint) jdkDeserialize(bytes);
         assertEquals(10, result.x);
@@ -287,7 +291,7 @@ class SerialStreamRoundTripTest {
 
     @Test
     void writerString() throws Exception {
-        Serialized graph = ctx.serialize("hello world");
+        Serialized graph = ser.serialize("hello world");
         byte[] bytes = writeToBytes(graph);
         Object result = jdkDeserialize(bytes);
         assertEquals("hello world", result);
@@ -296,7 +300,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerIntArray() throws Exception {
         int[] original = { 1, 2, 3, Integer.MAX_VALUE, Integer.MIN_VALUE };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         int[] result = (int[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -305,7 +309,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerByteArray() throws Exception {
         byte[] original = { 0, 1, -1, Byte.MAX_VALUE, Byte.MIN_VALUE };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         byte[] result = (byte[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -314,7 +318,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerBooleanArray() throws Exception {
         boolean[] original = { true, false, true, true };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         boolean[] result = (boolean[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -323,7 +327,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerCharArray() throws Exception {
         char[] original = { 'a', 'Z', ' ', '￿' };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         char[] result = (char[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -332,7 +336,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerShortArray() throws Exception {
         short[] original = { Short.MIN_VALUE, 0, Short.MAX_VALUE };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         short[] result = (short[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -341,7 +345,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerLongArray() throws Exception {
         long[] original = { Long.MIN_VALUE, 0L, Long.MAX_VALUE };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         long[] result = (long[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -350,7 +354,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerFloatArray() throws Exception {
         float[] original = { 0.0f, -0.0f, Float.NaN, Float.POSITIVE_INFINITY, 3.14f };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         float[] result = (float[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -359,7 +363,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerDoubleArray() throws Exception {
         double[] original = { 0.0, -0.0, Double.NaN, Double.NEGATIVE_INFINITY, Math.PI };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         double[] result = (double[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -368,7 +372,7 @@ class SerialStreamRoundTripTest {
     @Test
     void writerObjectArray() throws Exception {
         String[] original = { "one", "two", null, "four" };
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         String[] result = (String[]) jdkDeserialize(bytes);
         assertArrayEquals(original, result);
@@ -376,7 +380,7 @@ class SerialStreamRoundTripTest {
 
     @Test
     void writerEmptyString() throws Exception {
-        Serialized graph = ctx.serialize("");
+        Serialized graph = ser.serialize("");
         byte[] bytes = writeToBytes(graph);
         assertEquals("", jdkDeserialize(bytes));
     }
@@ -682,7 +686,7 @@ class SerialStreamRoundTripTest {
         // write a SimplePoint with a ClassAnnotationWriter that emits
         // primitives + a string + an object as annotation data for each class desc
         SimplePoint original = new SimplePoint(42, -7);
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (SerialStreamWriter writer = SerialStreamWriter.builder(baos)
@@ -728,7 +732,7 @@ class SerialStreamRoundTripTest {
     @Test
     void objectInputReadAndAvailable() throws Exception {
         // test read(), read(byte[]), skip(), and available() via annotation callback
-        Serialized graph = ctx.serialize("test");
+        Serialized graph = ser.serialize("test");
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (SerialStreamWriter writer = SerialStreamWriter.builder(baos)
                 .classAnnotationWriter((classDesc, w) -> {
@@ -758,7 +762,7 @@ class SerialStreamRoundTripTest {
     @Test
     void objectInputPartialReadWithSkipAnnotation() throws Exception {
         // test that partial consumption in the callback is properly cleaned up
-        Serialized graph = ctx.serialize(new SimplePoint(1, 2));
+        Serialized graph = ser.serialize(new SimplePoint(1, 2));
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (SerialStreamWriter writer = SerialStreamWriter.builder(baos)
                 .classAnnotationWriter((classDesc, w) -> {
@@ -782,7 +786,7 @@ class SerialStreamRoundTripTest {
             Serialized result = reader.readSerialized();
             assertInstanceOf(SerializedSerializable.class, result);
             // verify the object still deserialized correctly despite partial annotation consumption
-            SimplePoint point = (SimplePoint) ctx.deserialize(result);
+            SimplePoint point = (SimplePoint) des.deserialize(result);
             assertEquals(1, point.x);
             assertEquals(2, point.y);
         }
@@ -828,7 +832,7 @@ class SerialStreamRoundTripTest {
     void crossValidationWritePath() throws Exception {
         // object → SerialContext.serialize() → SerialStreamWriter → bytes → OIS → verify
         SimplePoint original = new SimplePoint(11, 22);
-        Serialized graph = ctx.serialize(original);
+        Serialized graph = ser.serialize(original);
         byte[] bytes = writeToBytes(graph);
         SimplePoint result = (SimplePoint) jdkDeserialize(bytes);
         assertEquals(11, result.x);
@@ -841,7 +845,7 @@ class SerialStreamRoundTripTest {
         SimplePoint original = new SimplePoint(33, 44);
         byte[] bytes = jdkSerialize(original);
         Serialized graph = readFromBytes(bytes);
-        SimplePoint result = (SimplePoint) ctx.deserialize(graph);
+        SimplePoint result = (SimplePoint) des.deserialize(graph);
         assertEquals(33, result.x);
         assertEquals(44, result.y);
     }

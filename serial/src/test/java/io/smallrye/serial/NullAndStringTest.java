@@ -12,30 +12,32 @@ import org.junit.jupiter.api.Test;
 class NullAndStringTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     @Test
     void nullRoundTrip() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize(null);
+        Serialized serialized = ser.serialize(null);
         assertSame(SerializedNull.INSTANCE, serialized);
-        Object result = ctx.deserialize(serialized);
+        Object result = des.deserialize(serialized);
         assertNull(result);
     }
 
     @Test
     void stringRoundTrip() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize("hello");
+        Serialized serialized = ser.serialize("hello");
         assertInstanceOf(SerializedString.class, serialized);
         assertEquals("hello", ((SerializedString) serialized).string());
-        Object result = ctx.deserialize(serialized);
+        Object result = des.deserialize(serialized);
         assertEquals("hello", result);
     }
 
     @Test
     void emptyStringRoundTrip() throws IOException, ClassNotFoundException {
-        Serialized serialized = ctx.serialize("");
+        Serialized serialized = ser.serialize("");
         assertInstanceOf(SerializedString.class, serialized);
         assertEquals("", ((SerializedString) serialized).string());
-        Object result = ctx.deserialize(serialized);
+        Object result = des.deserialize(serialized);
         assertEquals("", result);
     }
 }

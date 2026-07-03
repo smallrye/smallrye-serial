@@ -339,6 +339,8 @@ class CapturedObjectInputTest {
     // ---- Mixed byte/object reading via Externalizable round trip ----
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * An {@link Externalizable} that reads from an objects→bytes→objects interleaving.
@@ -380,8 +382,8 @@ class CapturedObjectInputTest {
     @Test
     void objectsBytesObjectsRoundTrip() throws Exception {
         var original = new ObjBytesObj("alpha", 999, "omega");
-        Serialized serialized = ctx.serialize(original);
-        var result = (ObjBytesObj) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        var result = (ObjBytesObj) des.deserialize(serialized);
         assertEquals("alpha", result.first);
         assertEquals(999, result.middle);
         assertEquals("omega", result.last);
@@ -427,8 +429,8 @@ class CapturedObjectInputTest {
     @Test
     void bytesObjectsBytesRoundTrip() throws Exception {
         var original = new BytesObjBytes(7, "center", Long.MIN_VALUE);
-        Serialized serialized = ctx.serialize(original);
-        var result = (BytesObjBytes) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        var result = (BytesObjBytes) des.deserialize(serialized);
         assertEquals(7, result.first);
         assertEquals("center", result.middle);
         assertEquals(Long.MIN_VALUE, result.last);
@@ -482,8 +484,8 @@ class CapturedObjectInputTest {
     @Test
     void manyAlternationsRoundTrip() throws Exception {
         var original = new ManyAlternations(10, "twenty", 30L, "forty", (short) 50);
-        Serialized serialized = ctx.serialize(original);
-        var result = (ManyAlternations) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        var result = (ManyAlternations) des.deserialize(serialized);
         assertEquals(10, result.a);
         assertEquals("twenty", result.b);
         assertEquals(30L, result.c);

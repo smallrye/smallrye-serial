@@ -5,10 +5,10 @@ import java.io.InvalidClassException;
 import java.io.ObjectInputStream;
 import java.lang.invoke.MethodHandle;
 
-import io.smallrye.serial.SerialContext;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedRecord;
 import io.smallrye.serial.impl.ClassLocal;
+import io.smallrye.serial.impl.DeserializerContextImpl;
 import io.smallrye.serial.impl.RecordFactoryGenerator;
 import io.smallrye.serial.impl.RecordGetField;
 import io.smallrye.serial.impl.Util;
@@ -39,7 +39,7 @@ public final class RecordDeserializer implements ObjectDeserializer {
                 throw new InvalidClassException(clazz.getName(), "expected a record class");
             }
 
-            MethodHandle factory = ((SerialContext.DeserializerContextImpl) ctxt).classLocal(FACTORIES, clazz);
+            MethodHandle factory = ((DeserializerContextImpl) ctxt).classLocal(FACTORIES, clazz);
             RecordGetField getField = new RecordGetField(rec.fieldData(), ctxt);
             try {
                 return (Object) factory.invokeExact((ObjectInputStream.GetField) getField);
