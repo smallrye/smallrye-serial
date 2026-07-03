@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 class ExternalizableTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * A simple externalizable point used as a test fixture.
@@ -49,16 +51,16 @@ class ExternalizableTest {
     @Test
     void externalizableRoundTrip() throws IOException, ClassNotFoundException {
         ExternalizablePoint original = new ExternalizablePoint(10, 20);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedExternalizable.class, serialized);
-        ExternalizablePoint result = (ExternalizablePoint) ctx.deserialize(serialized);
+        ExternalizablePoint result = (ExternalizablePoint) des.deserialize(serialized);
         assertEquals(original.x, result.x);
         assertEquals(original.y, result.y);
     }
 
     @Test
     void checkIntermediateStructure() throws IOException {
-        Serialized serialized = ctx.serialize(new ExternalizablePoint(3, 4));
+        Serialized serialized = ser.serialize(new ExternalizablePoint(3, 4));
         SerializedExternalizable se = (SerializedExternalizable) serialized;
         assertInstanceOf(SerializedExternalizableClass.class, se.serializedClass());
         assertEquals(ExternalizablePoint.class.getName(), se.serializedClass().name());

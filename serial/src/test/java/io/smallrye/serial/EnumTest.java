@@ -12,19 +12,21 @@ import org.junit.jupiter.api.Test;
 class EnumTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     @Test
     void enumRoundTrip() throws IOException, ClassNotFoundException {
         Thread.State original = Thread.State.RUNNABLE;
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         assertInstanceOf(SerializedEnum.class, serialized);
-        Object result = ctx.deserialize(serialized);
+        Object result = des.deserialize(serialized);
         assertSame(original, result);
     }
 
     @Test
     void checkIntermediateStructure() throws IOException {
-        Serialized serialized = ctx.serialize(Thread.State.BLOCKED);
+        Serialized serialized = ser.serialize(Thread.State.BLOCKED);
         SerializedEnum se = (SerializedEnum) serialized;
         assertInstanceOf(SerializedEnumClass.class, se.enumClass());
         assertEquals("java.lang.Thread$State", se.enumClass().name());

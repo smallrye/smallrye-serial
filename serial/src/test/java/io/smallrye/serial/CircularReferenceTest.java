@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 class CircularReferenceTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * A serializable node that can reference another node, enabling circular graphs.
@@ -36,8 +38,8 @@ class CircularReferenceTest {
         Node original = new Node("self");
         original.next = original;
 
-        Serialized serialized = ctx.serialize(original);
-        Node result = (Node) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        Node result = (Node) des.deserialize(serialized);
 
         assertEquals("self", result.label);
         assertSame(result, result.next, "self-reference should preserve identity");
@@ -50,8 +52,8 @@ class CircularReferenceTest {
         a.next = b;
         b.next = a;
 
-        Serialized serializedA = ctx.serialize(a);
-        Node resultA = (Node) ctx.deserialize(serializedA);
+        Serialized serializedA = ser.serialize(a);
+        Node resultA = (Node) des.deserialize(serializedA);
 
         assertEquals("A", resultA.label);
         assertNotNull(resultA.next);

@@ -243,6 +243,8 @@ class CapturingObjectOutputTest {
     // ---- Mixed byte/object state transition tests via Externalizable round trip ----
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * An {@link Externalizable} that writes objects, bytes, and objects (the TreeSet pattern).
@@ -286,7 +288,7 @@ class CapturingObjectOutputTest {
     @Test
     void objectsBytesObjectsPattern() throws Exception {
         var original = new ObjBytesObj("hello", 42, "world");
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ext = assertInstanceOf(SerializedExternalizable.class, serialized);
         var data = ext.data();
         assertEquals(3, data.size());
@@ -296,7 +298,7 @@ class CapturingObjectOutputTest {
         // verify byte block contains the int
         assertEquals(42, ((StreamData.OfBytes) data.get(1)).getInt(0));
 
-        var result = (ObjBytesObj) ctx.deserialize(serialized);
+        var result = (ObjBytesObj) des.deserialize(serialized);
         assertEquals("hello", result.first);
         assertEquals(42, result.middle);
         assertEquals("world", result.last);
@@ -344,7 +346,7 @@ class CapturingObjectOutputTest {
     @Test
     void bytesObjectsBytesPattern() throws Exception {
         var original = new BytesObjBytes(99, "middle", Long.MAX_VALUE);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ext = assertInstanceOf(SerializedExternalizable.class, serialized);
         var data = ext.data();
         assertEquals(3, data.size());
@@ -354,7 +356,7 @@ class CapturingObjectOutputTest {
         assertEquals(99, ((StreamData.OfBytes) data.get(0)).getInt(0));
         assertEquals(Long.MAX_VALUE, ((StreamData.OfBytes) data.get(2)).getLong(0));
 
-        var result = (BytesObjBytes) ctx.deserialize(serialized);
+        var result = (BytesObjBytes) des.deserialize(serialized);
         assertEquals(99, result.first);
         assertEquals("middle", result.middle);
         assertEquals(Long.MAX_VALUE, result.last);
@@ -396,14 +398,14 @@ class CapturingObjectOutputTest {
     @Test
     void objectsOnlyCoalesce() throws Exception {
         var original = new ObjectsOnly("alpha", "beta");
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ext = assertInstanceOf(SerializedExternalizable.class, serialized);
         var data = ext.data();
         assertEquals(1, data.size());
         var objs = assertInstanceOf(StreamData.OfObjects.class, data.get(0));
         assertEquals(2, objs.size());
 
-        var result = (ObjectsOnly) ctx.deserialize(serialized);
+        var result = (ObjectsOnly) des.deserialize(serialized);
         assertEquals("alpha", result.a);
         assertEquals("beta", result.b);
     }
@@ -433,11 +435,11 @@ class CapturingObjectOutputTest {
     @Test
     void emptyExternalizableProducesNoData() throws Exception {
         var original = new EmptyExternalizable();
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ext = assertInstanceOf(SerializedExternalizable.class, serialized);
         assertTrue(ext.data().isEmpty());
 
-        var result = assertInstanceOf(EmptyExternalizable.class, ctx.deserialize(serialized));
+        var result = assertInstanceOf(EmptyExternalizable.class, des.deserialize(serialized));
         assertNotNull(result);
     }
 
@@ -490,7 +492,7 @@ class CapturingObjectOutputTest {
     @Test
     void multipleAlternationsPattern() throws Exception {
         var original = new MultiAlternation(1, "two", 3L, "four", (short) 5);
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ext = assertInstanceOf(SerializedExternalizable.class, serialized);
         var data = ext.data();
         // bytes(int) → objects(String) → bytes(long) → objects(String) → bytes(short)
@@ -504,7 +506,7 @@ class CapturingObjectOutputTest {
         assertEquals(3L, ((StreamData.OfBytes) data.get(2)).getLong(0));
         assertEquals((short) 5, ((StreamData.OfBytes) data.get(4)).getShort(0));
 
-        var result = (MultiAlternation) ctx.deserialize(serialized);
+        var result = (MultiAlternation) des.deserialize(serialized);
         assertEquals(1, result.a);
         assertEquals("two", result.b);
         assertEquals(3L, result.c);
@@ -545,7 +547,7 @@ class CapturingObjectOutputTest {
     @Test
     void nullObjectsBytesNullObjects() throws Exception {
         var original = new NullObjects();
-        Serialized serialized = ctx.serialize(original);
+        Serialized serialized = ser.serialize(original);
         var ext = assertInstanceOf(SerializedExternalizable.class, serialized);
         var data = ext.data();
         assertEquals(3, data.size());
@@ -553,6 +555,6 @@ class CapturingObjectOutputTest {
         assertInstanceOf(StreamData.OfBytes.class, data.get(1));
         assertInstanceOf(StreamData.OfObjects.class, data.get(2));
 
-        assertDoesNotThrow(() -> ctx.deserialize(serialized));
+        assertDoesNotThrow(() -> des.deserialize(serialized));
     }
 }

@@ -10,6 +10,7 @@ import java.util.List;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.ClassLocal;
+import io.smallrye.serial.impl.SerializerContextImpl;
 import io.smallrye.serial.impl.Util;
 import io.smallrye.serial.spi.ObjectSerializer;
 
@@ -86,7 +87,7 @@ public final class SerializedRecord extends Serialized {
         Serialized[] objData = objSize == 0 ? null : new Serialized[objSize];
 
         RecordComponent[] components = recordType.getRecordComponents();
-        MethodHandle[] accessors = ((SerialContext.SerializerContextImpl) ctxt).classLocal(RECORD_ACCESSORS, recordType);
+        MethodHandle[] accessors = ((SerializerContextImpl) ctxt).classLocal(RECORD_ACCESSORS, recordType);
 
         for (int i = 0; i < components.length; i++) {
             SerialField field = recordClass.streamField(components[i].getName());

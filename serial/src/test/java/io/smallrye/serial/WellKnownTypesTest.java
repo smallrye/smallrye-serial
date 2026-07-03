@@ -26,20 +26,22 @@ import org.junit.jupiter.api.Test;
 class WellKnownTypesTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     @Test
     void arrayListRoundTrip() throws IOException, ClassNotFoundException {
         ArrayList<String> original = new ArrayList<>(List.of("alpha", "beta", "gamma"));
-        Serialized serialized = ctx.serialize(original);
-        ArrayList<?> result = (ArrayList<?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        ArrayList<?> result = (ArrayList<?>) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
     @Test
     void hashMapRoundTrip() throws IOException, ClassNotFoundException {
         HashMap<String, Integer> original = new HashMap<>(Map.of("a", 1, "b", 2, "c", 3));
-        Serialized serialized = ctx.serialize(original);
-        HashMap<?, ?> result = (HashMap<?, ?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        HashMap<?, ?> result = (HashMap<?, ?>) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
@@ -49,8 +51,8 @@ class WellKnownTypesTest {
         original.put("first", 1);
         original.put("second", 2);
         original.put("third", 3);
-        Serialized serialized = ctx.serialize(original);
-        LinkedHashMap<?, ?> result = (LinkedHashMap<?, ?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        LinkedHashMap<?, ?> result = (LinkedHashMap<?, ?>) des.deserialize(serialized);
         assertEquals(original, result);
         // verify insertion order is preserved
         assertIterableEquals(original.keySet(), result.keySet());
@@ -59,8 +61,8 @@ class WellKnownTypesTest {
     @Test
     void hashSetRoundTrip() throws IOException, ClassNotFoundException {
         HashSet<String> original = new HashSet<>(Set.of("x", "y", "z"));
-        Serialized serialized = ctx.serialize(original);
-        HashSet<?> result = (HashSet<?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        HashSet<?> result = (HashSet<?>) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
@@ -70,8 +72,8 @@ class WellKnownTypesTest {
         original.put("cherry", 3);
         original.put("apple", 1);
         original.put("banana", 2);
-        Serialized serialized = ctx.serialize(original);
-        TreeMap<?, ?> result = (TreeMap<?, ?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        TreeMap<?, ?> result = (TreeMap<?, ?>) des.deserialize(serialized);
         assertEquals(original, result);
         assertIterableEquals(original.keySet(), result.keySet());
     }
@@ -79,8 +81,8 @@ class WellKnownTypesTest {
     @Test
     void treeSetRoundTrip() throws IOException, ClassNotFoundException {
         TreeSet<String> original = new TreeSet<>(Set.of("cherry", "apple", "banana"));
-        Serialized serialized = ctx.serialize(original);
-        TreeSet<?> result = (TreeSet<?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        TreeSet<?> result = (TreeSet<?>) des.deserialize(serialized);
         assertEquals(original, result);
         assertIterableEquals(original, result);
     }
@@ -88,16 +90,16 @@ class WellKnownTypesTest {
     @Test
     void collectionsUnmodifiableListRoundTrip() throws IOException, ClassNotFoundException {
         List<String> original = Collections.unmodifiableList(new ArrayList<>(List.of("a", "b", "c")));
-        Serialized serialized = ctx.serialize(original);
-        List<?> result = (List<?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        List<?> result = (List<?>) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
     @Test
     void dateRoundTrip() throws IOException, ClassNotFoundException {
         Date original = new Date(1234567890000L);
-        Serialized serialized = ctx.serialize(original);
-        Date result = (Date) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        Date result = (Date) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
@@ -106,16 +108,16 @@ class WellKnownTypesTest {
         EnumMap<Thread.State, String> original = new EnumMap<>(Thread.State.class);
         original.put(Thread.State.NEW, "new");
         original.put(Thread.State.RUNNABLE, "running");
-        Serialized serialized = ctx.serialize(original);
-        EnumMap<?, ?> result = (EnumMap<?, ?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        EnumMap<?, ?> result = (EnumMap<?, ?>) des.deserialize(serialized);
         assertEquals(original, result);
     }
 
     @Test
     void enumSetRoundTrip() throws IOException, ClassNotFoundException {
         EnumSet<Thread.State> original = EnumSet.of(Thread.State.NEW, Thread.State.BLOCKED);
-        Serialized serialized = ctx.serialize(original);
-        EnumSet<?> result = (EnumSet<?>) ctx.deserialize(serialized);
+        Serialized serialized = ser.serialize(original);
+        EnumSet<?> result = (EnumSet<?>) des.deserialize(serialized);
         assertEquals(original, result);
     }
 }

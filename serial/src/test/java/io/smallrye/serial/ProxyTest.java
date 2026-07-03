@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 class ProxyTest {
 
     private final SerialContext ctx = SerialContext.builder().addDefaultProviders().build();
+    private final Serializer ser = ctx.createSerializer();
+    private final Deserializer des = ctx.createDeserializer();
 
     /**
      * A simple serializable invocation handler that records the method name.
@@ -40,10 +42,10 @@ class ProxyTest {
                 new Class<?>[] { Runnable.class },
                 handler);
 
-        Serialized serialized = ctx.serialize(proxy);
+        Serialized serialized = ser.serialize(proxy);
         assertInstanceOf(SerializedProxyObject.class, serialized);
 
-        Object result = ctx.deserialize(serialized);
+        Object result = des.deserialize(serialized);
         assertTrue(Proxy.isProxyClass(result.getClass()));
         assertTrue(result instanceof Runnable);
         InvocationHandler resultHandler = Proxy.getInvocationHandler(result);
@@ -58,7 +60,7 @@ class ProxyTest {
                 new Class<?>[] { Runnable.class, Serializable.class },
                 new SimpleHandler());
 
-        Serialized serialized = ctx.serialize(proxy);
+        Serialized serialized = ser.serialize(proxy);
         SerializedProxyObject spo = (SerializedProxyObject) serialized;
         SerializedProxyClass pc = spo.proxyClass();
         List<String> ifNames = pc.interfaceNames();
