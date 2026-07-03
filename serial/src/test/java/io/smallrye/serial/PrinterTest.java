@@ -26,12 +26,12 @@ class PrinterTest {
 
     @Test
     void printString() {
-        assertEquals("\"hello\"", Printer.print(new SerializedString("hello")));
+        assertEquals("#1 \"hello\"", Printer.print(new SerializedString("hello")));
     }
 
     @Test
     void printStringWithEscapes() {
-        assertEquals("\"line1\\nline2\\t\\\\end\"",
+        assertEquals("#1 \"line1\\nline2\\t\\\\end\"",
                 Printer.print(new SerializedString("line1\nline2\t\\end")));
     }
 
@@ -158,7 +158,7 @@ class PrinterTest {
                         List.of())));
 
         String output = Printer.print(obj);
-        assertTrue(output.contains("java.lang.String name = \"hello\""), output);
+        assertTrue(output.contains("java.lang.String name = #") && output.contains("\"hello\""), output);
     }
 
     @Test
@@ -166,7 +166,7 @@ class PrinterTest {
         Serialized serialized = ser.serialize(Thread.State.NEW);
         String output = Printer.print(serialized);
         assertTrue(output.contains("enum java.lang.Thread$State"), output);
-        assertTrue(output.contains("constantName: \"NEW\""), output);
+        assertTrue(output.contains("constantName: #") && output.contains("\"NEW\""), output);
     }
 
     // ---- Arrays ----
@@ -238,8 +238,8 @@ class PrinterTest {
         Serialized serialized = ser.serialize(new String[] { "a", "b" });
         String output = Printer.print(serialized);
         assertTrue(output.contains("java.lang.String[2]"), output);
-        assertTrue(output.contains("[0] = \"a\""), output);
-        assertTrue(output.contains("[1] = \"b\""), output);
+        assertTrue(output.contains("[0] = #") && output.contains("\"a\""), output);
+        assertTrue(output.contains("[1] = #") && output.contains("\"b\""), output);
     }
 
     // ---- Circular references ----

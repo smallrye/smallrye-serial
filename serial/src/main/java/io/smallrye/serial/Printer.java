@@ -1,8 +1,10 @@
 package io.smallrye.serial;
 
 import java.lang.constant.ClassDesc;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.ListIterator;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.IntMap;
@@ -324,7 +326,9 @@ public final class Printer {
             if (value instanceof SerializedNull) {
                 sb.append("null");
             } else if (value instanceof SerializedString ss) {
-                printString(ss);
+                if (enter(ss)) {
+                    printString(ss);
+                }
             } else if (value instanceof SerializedKnownClassLoader cl) {
                 printKnownClassLoader(cl);
             } else if (value instanceof SerializedPrimitiveClass pc) {
@@ -611,7 +615,9 @@ public final class Printer {
 
         /**
          * Print a {@link SerializedSerializable} object instance with its class descriptor
-         * and per-class-level field data.
+         * and per-class-level field data. The data list is walked in parallel with the
+         * class descriptor's {@code superClass()} chain. Extra data entries not matching
+         * any level in the chain are flagged as unexpected.
          */
         private void printSerializable(final SerializedSerializable ss) {
             if (!enter(ss)) {
@@ -626,15 +632,54 @@ public final class Printer {
             newLine();
             sb.append("class: ");
             printValue(ss.serializedClass());
-            for (SerialData data : ss.data()) {
+            // walk the class hierarchy root-to-leaf alongside the data list
+            List<SerializedSerializableClass> levels = new ArrayList<>();
+            for (var c = ss.serializedClass(); c != null; c = c.superClass()) {
+                levels.add(0, c);
+            }
+            ListIterator<SerialData> dataIter = ss.data().listIterator();
+            for (var c : levels) {
+                SerialData data = consumeIfMatches(dataIter, c);
+                if (data == null) {
+                    continue;
+                }
                 newLine();
-                sb.append(data.serializedClass().name());
+                sb.append(c.name());
                 openBlock();
                 printFieldValues(data);
                 printStreamDataList(data.streamData());
                 closeBlock();
             }
+            // flag any unexpected extra data entries
+            while (dataIter.hasNext()) {
+                SerialData extra = dataIter.next();
+                newLine();
+                sb.append("<unexpected data for ").append(extra.serializedClass().name()).append('>');
+                openBlock();
+                printFieldValues(extra);
+                printStreamDataList(extra.streamData());
+                closeBlock();
+            }
             closeBlock();
+        }
+
+        /**
+         * Consume the next data entry from the iterator if it matches the expected class descriptor.
+         *
+         * @param iter the data list iterator
+         * @param expected the expected class descriptor for this level
+         * @return the matching data entry, or {@code null} if no match
+         */
+        private static SerialData consumeIfMatches(final ListIterator<SerialData> iter,
+                final SerializedSerializableClass expected) {
+            if (iter.hasNext()) {
+                SerialData entry = iter.next();
+                if (entry.serializedClass() == expected) {
+                    return entry;
+                }
+                iter.previous();
+            }
+            return null;
         }
 
         /**

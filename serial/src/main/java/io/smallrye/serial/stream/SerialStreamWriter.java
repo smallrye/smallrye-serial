@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UTFDataFormatException;
 import java.lang.constant.ConstantDescs;
+import java.util.ArrayList;
 import java.util.List;
 
 import io.smallrye.common.constraint.Assert;
@@ -533,8 +534,7 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
         if (classDesc instanceof SerializedSerializableClass c) {
             writeRawUTF(c.name());
             out.writeLong(c.serialVersionUID());
-            // always set SC_WRITE_METHOD so we uniformly write TC_ENDBLOCKDATA after each level
-            out.writeByte(SC_SERIALIZABLE | SC_WRITE_METHOD);
+            out.writeByte(SC_SERIALIZABLE | (c.hasWriteMethod() ? SC_WRITE_METHOD : 0));
             writeFieldDescs(c);
             writeClassAnnotation(c);
             writeClassDesc(c.superClass());
@@ -627,13 +627,43 @@ public final class SerialStreamWriter implements SerialOutput, Closeable {
 
     /**
      * Write a serializable object: TC_OBJECT + class desc + handle + per-level data.
+     * Walks the class descriptor chain root-to-leaf, looking up data per level.
      */
     private void writeSerializable(SerializedSerializable s) throws IOException {
         out.writeByte(TC_OBJECT);
         writeClassDesc(s.serializedClass());
         assignHandle(s);
-        for (SerialData level : s.data()) {
-            writeClassLevelData(level, true);
+        List<SerializedSerializableClass> levels = new ArrayList<>();
+        for (var c = s.serializedClass(); c != null; c = c.superClass()) {
+            levels.add(0, c);
+        }
+        for (var c : levels) {
+            SerialData level = s.dataFor(c);
+            if (level != null) {
+                writeClassLevelData(level, c.hasWriteMethod());
+            } else {
+                writeEmptyClassLevelData(c);
+            }
+        }
+    }
+
+    /**
+     * Write an empty class level's data: zero-filled primitive fields, null object fields,
+     * and TC_ENDBLOCKDATA if the class has a write method.
+     *
+     * @param c the class descriptor for the empty level
+     */
+    private void writeEmptyClassLevelData(SerializedSerializableClass c) throws IOException {
+        int primSize = c.primitiveBufferSize();
+        if (primSize > 0) {
+            out.write(new byte[primSize]);
+        }
+        int objSize = c.objectBufferSize();
+        for (int i = 0; i < objSize; i++) {
+            out.writeByte(TC_NULL);
+        }
+        if (c.hasWriteMethod()) {
+            out.writeByte(TC_ENDBLOCKDATA);
         }
     }
 
