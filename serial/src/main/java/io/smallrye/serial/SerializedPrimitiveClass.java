@@ -2,6 +2,9 @@ package io.smallrye.serial;
 
 import java.lang.constant.ClassDesc;
 
+import io.smallrye.serial.impl.Primitive;
+import io.smallrye.serial.impl.Util;
+
 /**
  * The serialized representation of a primitive type or {@code void}.
  * <p>
@@ -43,6 +46,11 @@ public final class SerializedPrimitiveClass extends SerializedClass {
         super(classDesc, SerializedKnownClassLoader.forBootClassLoader());
     }
 
+    @Override
+    final String computeName() {
+        return Util.primitiveTypeName(descriptorString().charAt(0));
+    }
+
     /**
      * Return the singleton for the given primitive class descriptor.
      *
@@ -63,17 +71,10 @@ public final class SerializedPrimitiveClass extends SerializedClass {
      * @throws IllegalArgumentException if the type code is not a recognized primitive type code
      */
     public static SerializedPrimitiveClass of(char typeCode) {
-        return switch (typeCode) {
-            case 'Z' -> BOOLEAN;
-            case 'B' -> BYTE;
-            case 'C' -> CHAR;
-            case 'S' -> SHORT;
-            case 'I' -> INT;
-            case 'J' -> LONG;
-            case 'F' -> FLOAT;
-            case 'D' -> DOUBLE;
-            case 'V' -> VOID;
-            default -> throw new IllegalArgumentException("Not a primitive type code: " + typeCode);
-        };
+        Primitive prim = Primitive.forTypeCode(typeCode);
+        if (prim == null) {
+            throw new IllegalArgumentException("Not a primitive type code: " + typeCode);
+        }
+        return prim.serializedClass();
     }
 }

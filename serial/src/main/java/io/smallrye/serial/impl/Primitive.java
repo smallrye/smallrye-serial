@@ -3,29 +3,31 @@ package io.smallrye.serial.impl;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDescs;
 
+import io.smallrye.serial.SerializedPrimitiveClass;
+
 /**
  * The primitive types of the Java language, with associated metadata
  * for serialization operations.
  */
 public enum Primitive {
     /** The {@code boolean} type. */
-    BOOLEAN('Z', "boolean", 1, 1, ConstantDescs.CD_boolean),
+    BOOLEAN('Z', "boolean", 1, 1, ConstantDescs.CD_boolean, SerializedPrimitiveClass.BOOLEAN),
     /** The {@code byte} type. */
-    BYTE('B', "byte", 1, 1, ConstantDescs.CD_byte),
+    BYTE('B', "byte", 1, 1, ConstantDescs.CD_byte, SerializedPrimitiveClass.BYTE),
     /** The {@code char} type. */
-    CHAR('C', "char", 2, 1, ConstantDescs.CD_char),
+    CHAR('C', "char", 2, 1, ConstantDescs.CD_char, SerializedPrimitiveClass.CHAR),
     /** The {@code short} type. */
-    SHORT('S', "short", 2, 1, ConstantDescs.CD_short),
+    SHORT('S', "short", 2, 1, ConstantDescs.CD_short, SerializedPrimitiveClass.SHORT),
     /** The {@code int} type. */
-    INT('I', "int", 4, 1, ConstantDescs.CD_int),
+    INT('I', "int", 4, 1, ConstantDescs.CD_int, SerializedPrimitiveClass.INT),
     /** The {@code long} type. */
-    LONG('J', "long", 8, 2, ConstantDescs.CD_long),
+    LONG('J', "long", 8, 2, ConstantDescs.CD_long, SerializedPrimitiveClass.LONG),
     /** The {@code float} type. */
-    FLOAT('F', "float", 4, 1, ConstantDescs.CD_float),
+    FLOAT('F', "float", 4, 1, ConstantDescs.CD_float, SerializedPrimitiveClass.FLOAT),
     /** The {@code double} type. */
-    DOUBLE('D', "double", 8, 2, ConstantDescs.CD_double),
+    DOUBLE('D', "double", 8, 2, ConstantDescs.CD_double, SerializedPrimitiveClass.DOUBLE),
     /** The {@code void} type. */
-    VOID('V', "void", 0, 0, ConstantDescs.CD_void),
+    VOID('V', "void", 0, 0, ConstantDescs.CD_void, SerializedPrimitiveClass.VOID),
     ;
 
     private final char typeCode;
@@ -33,13 +35,16 @@ public enum Primitive {
     private final int byteSize;
     private final int slotSize;
     private final ClassDesc classDesc;
+    private final SerializedPrimitiveClass serializedClass;
 
-    Primitive(char typeCode, String typeName, int byteSize, int slotSize, ClassDesc classDesc) {
+    Primitive(char typeCode, String typeName, int byteSize, int slotSize, ClassDesc classDesc,
+            final SerializedPrimitiveClass serializedClass) {
         this.typeCode = typeCode;
         this.typeName = typeName;
         this.byteSize = byteSize;
         this.slotSize = slotSize;
         this.classDesc = classDesc;
+        this.serializedClass = serializedClass;
     }
 
     /**
@@ -119,5 +124,12 @@ public enum Primitive {
      */
     public static Primitive forClass(Class<?> type) {
         return forClassDesc(Util.classDesc(type));
+    }
+
+    /**
+     * {@return the serialized primitive class for this primitive type}
+     */
+    public SerializedPrimitiveClass serializedClass() {
+        return serializedClass;
     }
 }
