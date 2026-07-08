@@ -15,7 +15,7 @@ import java.util.List;
 import io.smallrye.common.constraint.Assert;
 import sun.misc.Unsafe;
 
-final class JDK24Specific {
+final class DefaultSerialization {
     // IMPORTANT NOTE: Do not be alarmed at the complexity/inefficiency/use of Unsafe here.
     // The Java24+ version delegates directly to the JDK without doing all of this stuff.
     // Also, maybe don't look at the JDK implementation either :-I
@@ -47,11 +47,11 @@ final class JDK24Specific {
         ObjectStreamField_field_offset = unsafe.objectFieldOffset(fieldField);
         try {
             readObjectHandle = MethodHandles.lookup().findStatic(
-                    JDK24Specific.class,
+                    DefaultSerialization.class,
                     "defaultReadObject",
                     MethodType.methodType(void.class, List.class, Object.class, ObjectInputStream.class));
             writeObjectHandle = MethodHandles.lookup().findStatic(
-                    JDK24Specific.class,
+                    DefaultSerialization.class,
                     "defaultWriteObject",
                     MethodType.methodType(void.class, List.class, Object.class, ObjectOutputStream.class));
         } catch (NoSuchMethodException | IllegalAccessException e) {
@@ -59,7 +59,7 @@ final class JDK24Specific {
         }
     }
 
-    private JDK24Specific() {
+    private DefaultSerialization() {
     }
 
     static MethodHandle defaultWriteObjectForSerialization(final Class<?> type) {

@@ -20,7 +20,7 @@ public final class WriteUtil {
     static final ClassValue<MethodHandle> defaultWriteObjects = new ClassValue<MethodHandle>() {
         protected MethodHandle computeValue(final Class<?> type) {
             // todo: inline on JDK 24+ (MR-JAR layer already handles this)
-            return JDK24Specific.defaultWriteObjectForSerialization(type);
+            return DefaultSerialization.defaultWriteObjectForSerialization(type);
         }
     };
 
