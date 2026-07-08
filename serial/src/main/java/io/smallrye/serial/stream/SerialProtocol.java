@@ -4,7 +4,7 @@ package io.smallrye.serial.stream;
  * Wire-format constants for the Java serialization stream protocol.
  * Shared by {@link SerialStreamReader} and {@link SerialStreamWriter}.
  *
- * @see <a href="https://docs.oracle.com/en/java/docs/books/jls/serialization/protocol.html">
+ * @see <a href="https://docs.oracle.com/en/java/javase/26/docs/specs/serialization/index.html">
  *      Java Object Serialization Protocol</a>
  */
 final class SerialProtocol {

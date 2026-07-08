@@ -35,6 +35,9 @@ public final class SerializedObjectArray extends SerializedArray {
     @SuppressWarnings("unused") // accessed by method handle
     SerializedObjectArray(final Object[] source, final ObjectSerializer.Context ctxt) throws IOException {
         this.arrayType = ctxt.serialize(source.getClass(), SerializedArrayClass.class);
+        if (arrayType.componentType().descriptor().isPrimitive()) {
+            throw new IllegalArgumentException("Object array type descriptor must not have primitive component type");
+        }
         this.array = new Serialized[source.length];
         ctxt.preSetSerialized(this);
         for (int i = 0; i < source.length; i++) {
