@@ -3,7 +3,6 @@ package io.smallrye.serial;
 import java.lang.constant.ClassDesc;
 
 import io.smallrye.common.constraint.Assert;
-import io.smallrye.serial.impl.Util;
 
 /**
  * The serialized representation of a {@link Class}.
@@ -52,7 +51,7 @@ public abstract sealed class SerializedClass extends Serialized
      * {@return the name of the serialized class in {@link Class#getName()} format (not {@code null})}
      * The name is lazily computed from the {@linkplain #descriptor() class descriptor} and cached.
      */
-    public String name() {
+    public final String name() {
         String n = name;
         if (n == null) {
             name = n = computeName();
@@ -62,15 +61,13 @@ public abstract sealed class SerializedClass extends Serialized
 
     /**
      * Compute the {@link Class#getName()}-format name from the stored class descriptor.
+     * Subclasses with non-reference-type descriptors override this method.
+     *
+     * @return the computed name (not {@code null})
      */
-    private String computeName() {
+    String computeName() {
         String desc = classDesc.descriptorString();
-        char typeCode = desc.charAt(0);
-        return switch (typeCode) {
-            case '[' -> desc.replace('/', '.');
-            case 'L' -> desc.substring(1, desc.length() - 1).replace('/', '.');
-            default -> Util.primitiveTypeName(typeCode);
-        };
+        return desc.substring(1, desc.length() - 1).replace('/', '.');
     }
 
     /**

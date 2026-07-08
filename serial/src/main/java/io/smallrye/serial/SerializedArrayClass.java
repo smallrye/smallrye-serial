@@ -58,6 +58,11 @@ public final class SerializedArrayClass extends SerializedVersionedClass {
         this.componentType = Assert.checkNotNullParam("componentType", componentType);
     }
 
+    @Override
+    final String computeName() {
+        return descriptorString().replace('/', '.');
+    }
+
     /**
      * {@return the class descriptor of the array's component type (not {@code null})}
      * For multi-dimensional arrays, this is itself a {@code SerializedArrayClass}.
