@@ -10,13 +10,28 @@ public final class SerializedDoubleArray extends SerializedArray {
     private final double[] array;
 
     /**
-     * Construct a new instance.
+     * Construct a new instance using {@link SerializedArrayClass#DOUBLE_ARRAY} as the array type.
      *
-     * @param arrayType the class descriptor for the array type (must not be {@code null})
      * @param array the array (must not be {@code null})
      */
+    public SerializedDoubleArray(final double[] array) {
+        this(SerializedArrayClass.DOUBLE_ARRAY, array);
+    }
+
+    /**
+     * Construct a new instance.
+     *
+     * @param arrayType the class descriptor for the array type (must not be {@code null};
+     *        must have a {@code double} component type)
+     * @param array the array (must not be {@code null})
+     * @throws IllegalArgumentException if the array type's component type is not {@code double}
+     */
     public SerializedDoubleArray(final SerializedArrayClass arrayType, final double[] array) {
-        this.arrayType = Assert.checkNotNullParam("arrayType", arrayType);
+        Assert.checkNotNullParam("arrayType", arrayType);
+        if (arrayType.componentType() != SerializedPrimitiveClass.DOUBLE) {
+            throw new IllegalArgumentException("Array type descriptor must have double component type");
+        }
+        this.arrayType = arrayType;
         this.array = array.clone();
     }
 

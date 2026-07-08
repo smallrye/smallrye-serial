@@ -118,24 +118,6 @@ public enum Primitive {
      * @return the matching primitive, or {@code null}
      */
     public static Primitive forClass(Class<?> type) {
-        if (type == int.class)
-            return INT;
-        if (type == long.class)
-            return LONG;
-        if (type == boolean.class)
-            return BOOLEAN;
-        if (type == double.class)
-            return DOUBLE;
-        if (type == float.class)
-            return FLOAT;
-        if (type == byte.class)
-            return BYTE;
-        if (type == char.class)
-            return CHAR;
-        if (type == short.class)
-            return SHORT;
-        if (type == void.class)
-            return VOID;
-        return null;
+        return forClassDesc(Util.classDesc(type));
     }
 }

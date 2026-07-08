@@ -1,5 +1,6 @@
 package io.smallrye.serial;
 
+import java.io.ObjectStreamClass;
 import java.lang.constant.ClassDesc;
 
 import io.smallrye.common.constraint.Assert;
@@ -15,6 +16,31 @@ import io.smallrye.common.constraint.Assert;
  * compatibility purposes.
  */
 public final class SerializedArrayClass extends SerializedVersionedClass {
+
+    /** The array class descriptor for {@code boolean[]}. */
+    public static final SerializedArrayClass BOOLEAN_ARRAY = forPrimitive(boolean[].class, SerializedPrimitiveClass.BOOLEAN);
+    /** The array class descriptor for {@code byte[]}. */
+    public static final SerializedArrayClass BYTE_ARRAY = forPrimitive(byte[].class, SerializedPrimitiveClass.BYTE);
+    /** The array class descriptor for {@code char[]}. */
+    public static final SerializedArrayClass CHAR_ARRAY = forPrimitive(char[].class, SerializedPrimitiveClass.CHAR);
+    /** The array class descriptor for {@code short[]}. */
+    public static final SerializedArrayClass SHORT_ARRAY = forPrimitive(short[].class, SerializedPrimitiveClass.SHORT);
+    /** The array class descriptor for {@code int[]}. */
+    public static final SerializedArrayClass INT_ARRAY = forPrimitive(int[].class, SerializedPrimitiveClass.INT);
+    /** The array class descriptor for {@code long[]}. */
+    public static final SerializedArrayClass LONG_ARRAY = forPrimitive(long[].class, SerializedPrimitiveClass.LONG);
+    /** The array class descriptor for {@code float[]}. */
+    public static final SerializedArrayClass FLOAT_ARRAY = forPrimitive(float[].class, SerializedPrimitiveClass.FLOAT);
+    /** The array class descriptor for {@code double[]}. */
+    public static final SerializedArrayClass DOUBLE_ARRAY = forPrimitive(double[].class, SerializedPrimitiveClass.DOUBLE);
+
+    private static SerializedArrayClass forPrimitive(Class<?> arrayClass, SerializedPrimitiveClass componentType) {
+        return new SerializedArrayClass(
+                arrayClass.describeConstable().orElseThrow(),
+                SerializedKnownClassLoader.forBootClassLoader(),
+                ObjectStreamClass.lookup(arrayClass).getSerialVersionUID(),
+                componentType);
+    }
 
     private final SerializedClass componentType;
 

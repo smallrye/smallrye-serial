@@ -27,6 +27,7 @@ import io.smallrye.serial.SerializedPrimitiveClass;
 import io.smallrye.serial.SerializedRecordClass;
 import io.smallrye.serial.SerializedSerializableClass;
 import io.smallrye.serial.SerializedSpecialSerializableClass;
+import io.smallrye.serial.impl.Primitive;
 import io.smallrye.serial.impl.Util;
 import io.smallrye.serial.impl.WriteUtil;
 import io.smallrye.serial.spi.ObjectSerializer;
@@ -63,8 +64,24 @@ public final class ClassSerializer implements ObjectSerializer {
                     : ctxt.serialize(cl);
 
             if (clazz.isArray()) {
-                SerializedClass componentType = ctxt.serialize(clazz.getComponentType(), SerializedClass.class);
-                return new SerializedArrayClass(cd, classLoader, 0L, componentType);
+                Class<?> compType = clazz.getComponentType();
+                Primitive primitive = Primitive.forClass(compType);
+                if (primitive != null) {
+                    return switch (primitive) {
+                        case BOOLEAN -> SerializedArrayClass.BOOLEAN_ARRAY;
+                        case BYTE -> SerializedArrayClass.BYTE_ARRAY;
+                        case CHAR -> SerializedArrayClass.CHAR_ARRAY;
+                        case SHORT -> SerializedArrayClass.SHORT_ARRAY;
+                        case INT -> SerializedArrayClass.INT_ARRAY;
+                        case LONG -> SerializedArrayClass.LONG_ARRAY;
+                        case FLOAT -> SerializedArrayClass.FLOAT_ARRAY;
+                        case DOUBLE -> SerializedArrayClass.DOUBLE_ARRAY;
+                        case VOID -> throw new IllegalArgumentException("void[] is not serializable");
+                    };
+                }
+                SerializedClass componentType = ctxt.serialize(compType, SerializedClass.class);
+                return new SerializedArrayClass(cd, classLoader, ObjectStreamClass.lookup(clazz).getSerialVersionUID(),
+                        componentType);
             }
 
             ObjectStreamClass osc = ObjectStreamClass.lookup(clazz);
