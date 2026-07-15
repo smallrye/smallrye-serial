@@ -13,6 +13,12 @@ package io.smallrye.serial.impl;
  * {@code PDEP}/{@code PEXT} instructions on modern x86 processors.
  */
 public final class ModifiedUtf8Codec {
+    static {
+        if (Runtime.version().feature() >= 19) {
+            throw new InternalError("Expected JDK 19+ Multi-Release JAR class to be loaded");
+        }
+    }
+
     private ModifiedUtf8Codec() {
     }
 

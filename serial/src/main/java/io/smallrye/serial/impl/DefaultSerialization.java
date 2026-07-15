@@ -16,6 +16,12 @@ import io.smallrye.common.constraint.Assert;
 import sun.misc.Unsafe;
 
 final class DefaultSerialization {
+    static {
+        if (Runtime.version().feature() >= 24) {
+            throw new InternalError("Expected JDK 24+ Multi-Release JAR class to be loaded");
+        }
+    }
+
     // IMPORTANT NOTE: Do not be alarmed at the complexity/inefficiency/use of Unsafe here.
     // The Java24+ version delegates directly to the JDK without doing all of this stuff.
     // Also, maybe don't look at the JDK implementation either :-I
