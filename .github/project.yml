@@ -1,4 +1,4 @@
 name: SmallRye Serial
 release:
-    current-version: 1.0.beta3
+    current-version: 1.0.beta4
     next-version: 1.0-SNAPSHOT
