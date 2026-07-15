@@ -79,39 +79,35 @@ final class ClassSerializerUtil {
 
     /**
      * Compute the primitive buffer size from an array of fields with valid offsets.
+     * Since the fields are sorted already, we can start at the end and work backwards.
      *
      * @param fields the fields to compute sizes from
      * @return the primitive buffer size
      */
     static int computePrimitiveBufferSize(SerialField[] fields) {
-        int size = 0;
-        for (SerialField field : fields) {
+        for (int i = fields.length - 1; i >= 0; i--) {
+            final SerialField field = fields[i];
             if (field.isPrimitive()) {
-                int end = field.primitiveSize() + field.offset();
-                if (end > size) {
-                    size = end;
-                }
+                return field.primitiveSize() + field.offset();
             }
         }
-        return size;
+        return 0;
     }
 
     /**
      * Compute the object buffer size from an array of fields with valid offsets.
+     * Since the fields are sorted already, we can start at the end and work backwards.
      *
      * @param fields the fields to compute sizes from
      * @return the object buffer size
      */
     static int computeObjectBufferSize(SerialField[] fields) {
-        int size = 0;
-        for (SerialField field : fields) {
+        for (int i = fields.length - 1; i >= 0; i--) {
+            final SerialField field = fields[i];
             if (!field.isPrimitive()) {
-                int end = field.offset() + 1;
-                if (end > size) {
-                    size = end;
-                }
+                return field.offset() + 1;
             }
         }
-        return size;
+        return 0;
     }
 }
