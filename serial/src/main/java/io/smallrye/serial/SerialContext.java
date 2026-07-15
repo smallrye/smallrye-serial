@@ -7,23 +7,30 @@ import java.util.ServiceLoader;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.SerialContextImpl;
+import io.smallrye.serial.impl.providers.ArrayClassSerializer;
 import io.smallrye.serial.impl.providers.ArrayDeserializer;
 import io.smallrye.serial.impl.providers.ArraySerializer;
 import io.smallrye.serial.impl.providers.ClassDeserializer;
-import io.smallrye.serial.impl.providers.ClassSerializer;
+import io.smallrye.serial.impl.providers.EnumClassSerializer;
 import io.smallrye.serial.impl.providers.EnumDeserializer;
 import io.smallrye.serial.impl.providers.EnumSerializer;
+import io.smallrye.serial.impl.providers.ExternalizableClassSerializer;
 import io.smallrye.serial.impl.providers.ExternalizableDeserializer;
 import io.smallrye.serial.impl.providers.ExternalizableSerializer;
 import io.smallrye.serial.impl.providers.KnownClassLoaderDeserializer;
 import io.smallrye.serial.impl.providers.KnownClassLoaderSerializer;
+import io.smallrye.serial.impl.providers.NonSerializableClassSerializer;
+import io.smallrye.serial.impl.providers.PrimitiveClassSerializer;
 import io.smallrye.serial.impl.providers.ProxyDeserializer;
 import io.smallrye.serial.impl.providers.ProxySerializer;
 import io.smallrye.serial.impl.providers.ReadResolveDeserializer;
+import io.smallrye.serial.impl.providers.RecordClassSerializer;
 import io.smallrye.serial.impl.providers.RecordDeserializer;
 import io.smallrye.serial.impl.providers.RecordSerializer;
+import io.smallrye.serial.impl.providers.SerializableClassSerializer;
 import io.smallrye.serial.impl.providers.SerializableDeserializer;
 import io.smallrye.serial.impl.providers.SerializableSerializer;
+import io.smallrye.serial.impl.providers.SpecialClassSerializer;
 import io.smallrye.serial.impl.providers.StringDeserializer;
 import io.smallrye.serial.impl.providers.StringSerializer;
 import io.smallrye.serial.impl.providers.WriteReplaceSerializer;
@@ -89,7 +96,14 @@ public sealed interface SerialContext permits SerialContextImpl {
          */
         public Builder addDefaultProviders() {
             serializers.add(new WriteReplaceSerializer());
-            serializers.add(new ClassSerializer());
+            serializers.add(new PrimitiveClassSerializer());
+            serializers.add(new SpecialClassSerializer());
+            serializers.add(new ArrayClassSerializer());
+            serializers.add(new EnumClassSerializer());
+            serializers.add(new ExternalizableClassSerializer());
+            serializers.add(new RecordClassSerializer());
+            serializers.add(new SerializableClassSerializer());
+            serializers.add(new NonSerializableClassSerializer());
             serializers.add(new KnownClassLoaderSerializer());
             serializers.add(new EnumSerializer());
             serializers.add(new StringSerializer());
