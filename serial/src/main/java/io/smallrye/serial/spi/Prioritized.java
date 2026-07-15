@@ -8,15 +8,8 @@ package io.smallrye.serial.spi;
  * and other information.
  */
 public sealed interface Prioritized permits ObjectDeserializer, ObjectSerializer {
-    /**
-     * The priority of {@code readResolve}/{@code writeReplace} operations.
-     */
-    int PRIORITY_REPLACE = 20_000;
 
-    /**
-     * The priority of class loader serialization.
-     */
-    int PRIORITY_CLASS_LOADER = 19_000;
+    // ---- Class serializer priorities (handle Class<?> objects; above writeReplace) ----
 
     /**
      * The priority of {@link Class} deserialization.
@@ -63,40 +56,52 @@ public sealed interface Prioritized permits ObjectDeserializer, ObjectSerializer
      */
     int PRIORITY_NON_SERIALIZABLE_CLASS = 11_000;
 
+    // ---- Value serializer priorities (handle object values) ----
+
+    /**
+     * The priority of {@code readResolve}/{@code writeReplace} operations.
+     */
+    int PRIORITY_REPLACE = 10_000;
+
+    /**
+     * The priority of class loader serialization.
+     */
+    int PRIORITY_CLASS_LOADER = 9_000;
+
     /**
      * The priority of {@link Enum} value serialization.
      */
-    int PRIORITY_ENUM = 10_000;
+    int PRIORITY_ENUM = 8_000;
 
     /**
      * The priority of {@link String} value serialization.
      */
-    int PRIORITY_STRING = 9_000;
+    int PRIORITY_STRING = 7_000;
 
     /**
      * The priority of dynamic proxy serialization.
      */
-    int PRIORITY_PROXY = 8_000;
+    int PRIORITY_PROXY = 6_000;
 
     /**
      * The priority of record value serialization.
      */
-    int PRIORITY_RECORD = 7_000;
+    int PRIORITY_RECORD = 5_000;
 
     /**
      * The priority of array serialization.
      */
-    int PRIORITY_ARRAY = 6_000;
+    int PRIORITY_ARRAY = 4_000;
 
     /**
      * The priority of standard {@link java.io.Externalizable Externalizable} serialization.
      */
-    int PRIORITY_EXTERNALIZABLE = 5_000;
+    int PRIORITY_EXTERNALIZABLE = 3_000;
 
     /**
      * The priority of standard {@link java.io.Serializable Serializable} serialization.
      */
-    int PRIORITY_SERIALIZABLE = 4_000;
+    int PRIORITY_SERIALIZABLE = 2_000;
 
     /**
      * The default priority of user-provided serializers and deserializers.
