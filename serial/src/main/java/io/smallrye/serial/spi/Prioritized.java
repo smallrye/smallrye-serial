@@ -64,24 +64,39 @@ public sealed interface Prioritized permits ObjectDeserializer, ObjectSerializer
     int PRIORITY_NON_SERIALIZABLE_CLASS = 11_000;
 
     /**
-     * The priority of basic type serialization, such as {@link String} and {@link Enum}.
+     * The priority of {@link Enum} value serialization.
      */
-    int PRIORITY_BASIC = 10_000;
+    int PRIORITY_ENUM = 10_000;
+
+    /**
+     * The priority of {@link String} value serialization.
+     */
+    int PRIORITY_STRING = 9_000;
+
+    /**
+     * The priority of dynamic proxy serialization.
+     */
+    int PRIORITY_PROXY = 8_000;
+
+    /**
+     * The priority of record value serialization.
+     */
+    int PRIORITY_RECORD = 7_000;
 
     /**
      * The priority of array serialization.
      */
-    int PRIORITY_ARRAY = 9_000;
+    int PRIORITY_ARRAY = 6_000;
 
     /**
      * The priority of standard {@link java.io.Externalizable Externalizable} serialization.
      */
-    int PRIORITY_EXTERNALIZABLE = 8_000;
+    int PRIORITY_EXTERNALIZABLE = 5_000;
 
     /**
      * The priority of standard {@link java.io.Serializable Serializable} serialization.
      */
-    int PRIORITY_SERIALIZABLE = 7_000;
+    int PRIORITY_SERIALIZABLE = 4_000;
 
     /**
      * The default priority of user-provided serializers and deserializers.

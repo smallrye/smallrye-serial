@@ -37,6 +37,6 @@ public final class ProxyDeserializer implements ObjectDeserializer {
     }
 
     public int priority() {
-        return PRIORITY_BASIC;
+        return PRIORITY_PROXY;
     }
 }

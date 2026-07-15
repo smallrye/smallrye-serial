@@ -26,6 +26,6 @@ public final class RecordSerializer implements ObjectSerializer {
     }
 
     public int priority() {
-        return PRIORITY_BASIC;
+        return PRIORITY_RECORD;
     }
 }

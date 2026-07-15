@@ -33,6 +33,6 @@ public final class StringDeserializer implements ObjectDeserializer {
      * {@inheritDoc}
      */
     public int priority() {
-        return PRIORITY_BASIC;
+        return PRIORITY_STRING;
     }
 }

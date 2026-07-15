@@ -27,6 +27,6 @@ public final class EnumDeserializer implements ObjectDeserializer {
     }
 
     public int priority() {
-        return PRIORITY_BASIC;
+        return PRIORITY_ENUM;
     }
 }
