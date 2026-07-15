@@ -35,6 +35,6 @@ public final class StringSerializer implements ObjectSerializer {
      * {@inheritDoc}
      */
     public int priority() {
-        return PRIORITY_BASIC;
+        return PRIORITY_STRING;
     }
 }

@@ -54,6 +54,6 @@ public final class RecordDeserializer implements ObjectDeserializer {
     }
 
     public int priority() {
-        return PRIORITY_BASIC;
+        return PRIORITY_RECORD;
     }
 }
