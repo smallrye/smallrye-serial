@@ -11,6 +11,12 @@ import io.smallrye.common.constraint.Assert;
  * {@link #streamData()}), this record provides typed field accessors that look up the field by name
  * in the {@linkplain SerializedFieldedClass#streamFields() stream field layout} of the associated
  * {@link #serializedClass()}, resolve its offset, and read the value from the appropriate buffer.
+ *
+ * @param serializedClass the class corresponding to the data in this record (must not be {@code null})
+ * @param primitiveFieldData the primitive field data (must not be {@code null}, may be {@linkplain StreamData.OfBytes#EMPTY
+ *        empty})
+ * @param objectFieldData the object field data (must not be {@code null}, may be {@linkplain StreamData.OfObjects#EMPTY empty})
+ * @param streamData the stream data, if any (must not be {@code null})
  */
 public record SerialData(
         SerializedFieldedClass serializedClass,
@@ -18,6 +24,9 @@ public record SerialData(
         StreamData.OfObjects objectFieldData,
         List<StreamData> streamData) {
 
+    /**
+     * Construct a new instance.
+     */
     public SerialData {
         Assert.checkNotNullParam("serializedClass", serializedClass);
         Assert.checkNotNullParam("primitiveFieldData", primitiveFieldData);

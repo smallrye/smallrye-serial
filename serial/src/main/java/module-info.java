@@ -1,4 +1,6 @@
-
+/**
+ * SmallRye Serial: a Java serialization implementation.
+ */
 module io.smallrye.serial {
     requires io.smallrye.common.constraint;
     requires io.smallrye.classfile;
