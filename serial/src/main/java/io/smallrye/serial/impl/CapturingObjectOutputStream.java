@@ -88,7 +88,7 @@ public final class CapturingObjectOutputStream extends ObjectOutputStream {
         if (state != ST_INITIAL) {
             throw fieldsAlreadyWritten();
         }
-        WriteUtil.defaultWriteObject(serialClass, serialObject, this);
+        WriteUtil.defaultWriteObject((SerializerContextImpl) context, serialClass, serialObject, this);
         // should have done something
         if (state == ST_INITIAL) {
             throw noObjectStreamFields();

@@ -11,6 +11,7 @@ import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedSerializable;
 import io.smallrye.serial.SerializedSerializableClass;
 import io.smallrye.serial.impl.CapturedObjectInputStream;
+import io.smallrye.serial.impl.DeserializerContextImpl;
 import io.smallrye.serial.impl.ReadUtil;
 import io.smallrye.serial.spi.ObjectDeserializer;
 
@@ -44,7 +45,7 @@ public final class SerializableDeserializer implements ObjectDeserializer {
                 if (Externalizable.class.isAssignableFrom(clazz)) {
                     throw new InvalidObjectException("Serialized " + clazz + " must not implement Externalizable");
                 }
-                Object object = ReadUtil.newSerializableInstance(clazz);
+                Object object = ReadUtil.newSerializableInstance((DeserializerContextImpl) ctxt, clazz);
                 ctxt.preSetObject(object);
                 ListIterator<SerialData> dataIter = ser.data().listIterator();
                 deserialize(ctxt, dataIter, object, clazz, type, clazz);
@@ -77,6 +78,7 @@ public final class SerializableDeserializer implements ObjectDeserializer {
     private void deserialize(final Context ctxt, final ListIterator<SerialData> dataIter, final Object object,
             final Class<?> local, final SerializedSerializableClass remoteSer, final Class<?> remote)
             throws IOException, ClassNotFoundException {
+        DeserializerContextImpl ctxtImpl = (DeserializerContextImpl) ctxt;
         if (remote == local) {
             // first do parent, then this level
             if (remoteSer.superClass() != null) {
@@ -95,18 +97,18 @@ public final class SerializableDeserializer implements ObjectDeserializer {
             if (item != null) {
                 CapturedObjectInputStream ois = new CapturedObjectInputStream(ctxt, local, object, remoteSer,
                         item.primitiveFieldData(), item.objectFieldData(), item.streamData());
-                if (ReadUtil.hasReadObject(local)) {
-                    ReadUtil.readObject(local, object, ois);
+                if (ReadUtil.hasReadObject(ctxtImpl, local)) {
+                    ReadUtil.readObject(ctxtImpl, local, object, ois);
                 } else {
-                    ReadUtil.defaultReadObject(local, object, ois);
+                    ReadUtil.defaultReadObject(ctxtImpl, local, object, ois);
                 }
             }
             // else: gap — no data for this level, fields keep their default values
         } else if (remote.isAssignableFrom(local)) {
             // remote is a supertype of local; local has an extra level with no remote data
             deserialize(ctxt, dataIter, object, local.getSuperclass(), remoteSer, remote);
-            if (ReadUtil.hasReadObjectNoData(local)) {
-                ReadUtil.readObjectNoData(local, object);
+            if (ReadUtil.hasReadObjectNoData(ctxtImpl, local)) {
+                ReadUtil.readObjectNoData(ctxtImpl, local, object);
             }
         } else if (local.isAssignableFrom(remote)) {
             // local is a supertype of remote; remote has an extra level not present locally

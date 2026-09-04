@@ -55,7 +55,7 @@ public final class CapturedObjectInputStream extends ObjectInputStream {
         if (state != ST_INITIAL) {
             throw fieldsAlreadyRead();
         }
-        ReadUtil.defaultReadObject(serialClass, serialObject, this);
+        ReadUtil.defaultReadObject((DeserializerContextImpl) context, serialClass, serialObject, this);
         // should have done something
         if (state == ST_INITIAL) {
             throw fieldsNotRead();
