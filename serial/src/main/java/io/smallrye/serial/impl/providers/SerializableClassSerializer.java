@@ -14,6 +14,7 @@ import java.util.List;
 import io.smallrye.serial.SerialField;
 import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedSerializableClass;
+import io.smallrye.serial.impl.SerializerContextImpl;
 import io.smallrye.serial.impl.Util;
 import io.smallrye.serial.impl.WriteUtil;
 import io.smallrye.serial.spi.ObjectSerializer;
@@ -65,7 +66,7 @@ public final class SerializableClassSerializer implements ObjectSerializer {
                             cd, classLoader, superClass, List.of(fields),
                             ClassSerializerUtil.computePrimitiveBufferSize(fields),
                             ClassSerializerUtil.computeObjectBufferSize(fields),
-                            uid, WriteUtil.hasWriteObject(clazz));
+                            uid, WriteUtil.hasWriteObject((SerializerContextImpl) ctxt, clazz));
                 } catch (Error | RuntimeException e) {
                     throw e;
                 } catch (Throwable e) {

@@ -41,7 +41,7 @@ public final class SerializerContextImpl implements ObjectSerializer.Context {
      * {@inheritDoc}
      */
     public Serialized next() throws IOException {
-        List<ObjectSerializer> serializers = session.context().serializers();
+        List<ObjectSerializer> serializers = session.context().objectSerializers();
         if (current == serializers.size()) {
             throw new NotSerializableException(object.getClass().getName());
         }

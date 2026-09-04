@@ -41,7 +41,7 @@ public final class DeserializerContextImpl implements ObjectDeserializer.Context
      * {@inheritDoc}
      */
     public Object next() throws IOException, ClassNotFoundException {
-        List<ObjectDeserializer> deserializers = session.context().deserializers();
+        List<ObjectDeserializer> deserializers = session.context().objectDeserializers();
         if (current == deserializers.size()) {
             throw new NotSerializableException("No deserializer available for " + serialized.getClass().getName());
         }

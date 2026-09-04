@@ -7,32 +7,21 @@ import java.lang.invoke.MethodHandle;
 
 public final class WriteUtil {
 
-    static final ClassValue<MethodHandle> writeReplaces = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            return Util.RF.writeReplaceForSerialization(type);
-        }
-    };
-    static final ClassValue<MethodHandle> writeObjects = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            return Util.RF.writeObjectForSerialization(type);
-        }
-    };
-    static final ClassValue<MethodHandle> defaultWriteObjects = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            // todo: inline on JDK 24+ (MR-JAR layer already handles this)
-            return DefaultSerialization.defaultWriteObjectForSerialization(type);
-        }
-    };
+    static final ClassLocal<MethodHandle> writeReplaces = new ClassLocal<>(Util.RF::writeReplaceForSerialization);
+    static final ClassLocal<MethodHandle> writeObjects = new ClassLocal<>(Util.RF::writeObjectForSerialization);
+    static final ClassLocal<MethodHandle> defaultWriteObjects = new ClassLocal<>(
+            DefaultSerialization::defaultWriteObjectForSerialization);
 
     private WriteUtil() {
     }
 
-    public static boolean hasWriteObject(Class<?> type) {
-        return writeObjects.get(type) != null;
+    public static boolean hasWriteObject(SerializerContextImpl ctxt, Class<?> type) {
+        return ctxt.classLocal(writeObjects, type) != null;
     }
 
-    public static void writeObject(Class<?> type, Object serializable, ObjectOutputStream oos) throws IOException {
-        MethodHandle mh = writeObjects.get(type);
+    public static void writeObject(SerializerContextImpl ctxt, Class<?> type, Object serializable, ObjectOutputStream oos)
+            throws IOException {
+        MethodHandle mh = ctxt.classLocal(writeObjects, type);
         if (mh == null) {
             throw new IllegalArgumentException("No writeObject method found on " + type);
         }
@@ -45,8 +34,9 @@ public final class WriteUtil {
         }
     }
 
-    public static void defaultWriteObject(Class<?> type, Object serializable, ObjectOutputStream oos) throws IOException {
-        MethodHandle mh = defaultWriteObjects.get(type);
+    public static void defaultWriteObject(SerializerContextImpl ctxt, Class<?> type, Object serializable,
+            ObjectOutputStream oos) throws IOException {
+        MethodHandle mh = ctxt.classLocal(defaultWriteObjects, type);
         if (mh == null) {
             throw new IllegalArgumentException("No defaultWriteObject method available for " + type);
         }
@@ -59,15 +49,15 @@ public final class WriteUtil {
         }
     }
 
-    public static boolean hasWriteReplace(Class<?> type) {
-        return writeReplaces.get(type) != null;
+    public static boolean hasWriteReplace(SerializerContextImpl ctxt, Class<?> type) {
+        return ctxt.classLocal(writeReplaces, type) != null;
     }
 
-    public static Object writeReplace(Object object) throws ObjectStreamException {
+    public static Object writeReplace(SerializerContextImpl ctxt, Object object) throws ObjectStreamException {
         if (object == null) {
             return null;
         }
-        MethodHandle wr = writeReplaces.get(object.getClass());
+        MethodHandle wr = ctxt.classLocal(writeReplaces, object.getClass());
         if (wr == null) {
             throw new IllegalArgumentException("No writeReplace method found on " + object.getClass());
         }

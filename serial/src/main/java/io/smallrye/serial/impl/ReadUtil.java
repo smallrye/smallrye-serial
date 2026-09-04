@@ -11,48 +11,24 @@ public final class ReadUtil {
     // Constructor.newInstance() must be used here rather than unreflecting to a MethodHandle, because the
     // Constructor returned by ReflectionFactory has a declaring class of the non-serializable superclass
     // (not the target class), so unreflectConstructor would create instances of the wrong class.
-    static final ClassValue<Constructor<?>> serNewInstances = new ClassValue<>() {
-        protected Constructor<?> computeValue(final Class<?> type) {
-            return Util.RF.newConstructorForSerialization(type);
-        }
-    };
-    static final ClassValue<Constructor<?>> extNewInstances = new ClassValue<>() {
-        protected Constructor<?> computeValue(final Class<?> type) {
-            return Util.RF.newConstructorForExternalization(type);
-        }
-    };
-    static final ClassValue<MethodHandle> readObjects = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            return Util.RF.readObjectForSerialization(type);
-        }
-    };
-    static final ClassValue<MethodHandle> readObjectNoDatas = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            return Util.RF.readObjectNoDataForSerialization(type);
-        }
-    };
-    static final ClassValue<MethodHandle> defaultReadObjects = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            // todo: inline on JDK 24+ (MR-JAR layer already handles this)
-            return DefaultSerialization.defaultReadObjectForSerialization(type);
-        }
-    };
-    static final ClassValue<MethodHandle> readResolves = new ClassValue<MethodHandle>() {
-        protected MethodHandle computeValue(final Class<?> type) {
-            return Util.RF.readResolveForSerialization(type);
-        }
-    };
+    static final ClassLocal<Constructor<?>> serNewInstances = new ClassLocal<>(Util.RF::newConstructorForSerialization);
+    static final ClassLocal<Constructor<?>> extNewInstances = new ClassLocal<>(Util.RF::newConstructorForExternalization);
+    static final ClassLocal<MethodHandle> readObjects = new ClassLocal<>(Util.RF::readObjectForSerialization);
+    static final ClassLocal<MethodHandle> readObjectNoDatas = new ClassLocal<>(Util.RF::readObjectNoDataForSerialization);
+    static final ClassLocal<MethodHandle> defaultReadObjects = new ClassLocal<>(
+            DefaultSerialization::defaultReadObjectForSerialization);
+    static final ClassLocal<MethodHandle> readResolves = new ClassLocal<>(Util.RF::readResolveForSerialization);
 
     private ReadUtil() {
     }
 
-    public static boolean hasReadObject(Class<?> type) {
-        return readObjects.get(type) != null;
+    public static boolean hasReadObject(DeserializerContextImpl ctxt, Class<?> type) {
+        return ctxt.classLocal(readObjects, type) != null;
     }
 
-    public static void readObject(Class<?> type, Object serializable, ObjectInputStream ois)
+    public static void readObject(DeserializerContextImpl ctxt, Class<?> type, Object serializable, ObjectInputStream ois)
             throws IOException, ClassNotFoundException {
-        MethodHandle mh = readObjects.get(type);
+        MethodHandle mh = ctxt.classLocal(readObjects, type);
         if (mh == null) {
             throw new IllegalArgumentException("No readObject method found on " + type);
         }
@@ -65,12 +41,13 @@ public final class ReadUtil {
         }
     }
 
-    public static boolean hasReadObjectNoData(Class<?> type) {
-        return readObjectNoDatas.get(type) != null;
+    public static boolean hasReadObjectNoData(DeserializerContextImpl ctxt, Class<?> type) {
+        return ctxt.classLocal(readObjectNoDatas, type) != null;
     }
 
-    public static void readObjectNoData(Class<?> type, Object serializable) throws ObjectStreamException {
-        MethodHandle mh = readObjectNoDatas.get(type);
+    public static void readObjectNoData(DeserializerContextImpl ctxt, Class<?> type, Object serializable)
+            throws ObjectStreamException {
+        MethodHandle mh = ctxt.classLocal(readObjectNoDatas, type);
         if (mh == null) {
             throw new IllegalArgumentException("No readObject method found on " + type);
         }
@@ -83,9 +60,10 @@ public final class ReadUtil {
         }
     }
 
-    public static void defaultReadObject(Class<?> type, Object serializable, ObjectInputStream ois)
+    public static void defaultReadObject(DeserializerContextImpl ctxt, Class<?> type, Object serializable,
+            ObjectInputStream ois)
             throws IOException, ClassNotFoundException {
-        MethodHandle mh = defaultReadObjects.get(type);
+        MethodHandle mh = ctxt.classLocal(defaultReadObjects, type);
         if (mh == null) {
             throw new IllegalArgumentException("No defaultReadObject method available for " + type);
         }
@@ -98,8 +76,8 @@ public final class ReadUtil {
         }
     }
 
-    public static <T> T newSerializableInstance(final Class<T> clazz) {
-        Constructor<?> ctor = serNewInstances.get(clazz);
+    public static <T> T newSerializableInstance(DeserializerContextImpl ctxt, final Class<T> clazz) {
+        Constructor<?> ctor = ctxt.classLocal(serNewInstances, clazz);
         if (ctor == null) {
             throw new IllegalArgumentException("No valid constructor found on serializable " + clazz);
         }
@@ -112,13 +90,13 @@ public final class ReadUtil {
         }
     }
 
-    public static Externalizable newExternalizableInstance(final Class<? extends Externalizable> clazz) {
-        Constructor<?> ctor = extNewInstances.get(clazz);
+    public static <T extends Externalizable> T newExternalizableInstance(DeserializerContextImpl ctxt, Class<T> clazz) {
+        Constructor<?> ctor = ctxt.classLocal(extNewInstances, clazz);
         if (ctor == null) {
             throw new IllegalArgumentException("No valid constructor found on Externalizable " + clazz);
         }
         try {
-            return (Externalizable) ctor.newInstance();
+            return clazz.cast(ctor.newInstance());
         } catch (RuntimeException | Error e) {
             throw e;
         } catch (Throwable e) {
@@ -126,15 +104,15 @@ public final class ReadUtil {
         }
     }
 
-    public static boolean hasReadResolve(Class<?> clazz) {
-        return readResolves.get(clazz) != null;
+    public static boolean hasReadResolve(DeserializerContextImpl ctxt, Class<?> clazz) {
+        return ctxt.classLocal(readResolves, clazz) != null;
     }
 
-    public static Object readResolve(Object object) throws ObjectStreamException {
+    public static Object readResolve(DeserializerContextImpl ctxt, Object object) throws ObjectStreamException {
         if (object == null) {
             return null;
         }
-        MethodHandle rr = readResolves.get(object.getClass());
+        MethodHandle rr = ctxt.classLocal(readResolves, object.getClass());
         if (rr == null) {
             throw new IllegalArgumentException("No readResolve method found on " + object.getClass());
         }

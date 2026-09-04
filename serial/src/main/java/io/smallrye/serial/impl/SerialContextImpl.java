@@ -61,16 +61,16 @@ public final class SerialContextImpl implements SerialContext {
     }
 
     /**
-     * {@return the immutable list of configured serializers, sorted by priority (not {@code null})}
+     * {@return the immutable list of configured object serializers, sorted by priority (not {@code null})}
      */
-    public List<ObjectSerializer> serializers() {
+    public List<ObjectSerializer> objectSerializers() {
         return serializers;
     }
 
     /**
-     * {@return the immutable list of configured deserializers, sorted by priority (not {@code null})}
+     * {@return the immutable list of configured object deserializers, sorted by priority (not {@code null})}
      */
-    public List<ObjectDeserializer> deserializers() {
+    public List<ObjectDeserializer> objectDeserializers() {
         return deserializers;
     }
 

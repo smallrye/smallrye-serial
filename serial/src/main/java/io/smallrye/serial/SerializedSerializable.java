@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 
 import io.smallrye.common.constraint.Assert;
 import io.smallrye.serial.impl.CapturingObjectOutputStream;
+import io.smallrye.serial.impl.SerializerContextImpl;
 import io.smallrye.serial.impl.WriteUtil;
 import io.smallrye.serial.spi.ObjectSerializer;
 
@@ -169,10 +170,11 @@ public final class SerializedSerializable extends Serialized {
                 buildData(context, object, clazz.getSuperclass(), streamClass.superClass(), data);
                 try (CapturingObjectOutputStream oos = new CapturingObjectOutputStream(context, clazz, object,
                         streamClass)) {
-                    if (WriteUtil.hasWriteObject(clazz)) {
-                        WriteUtil.writeObject(clazz, object, oos);
+                    SerializerContextImpl ctxtImpl = (SerializerContextImpl) context;
+                    if (WriteUtil.hasWriteObject(ctxtImpl, clazz)) {
+                        WriteUtil.writeObject(ctxtImpl, clazz, object, oos);
                     } else {
-                        WriteUtil.defaultWriteObject(clazz, object, oos);
+                        WriteUtil.defaultWriteObject(ctxtImpl, clazz, object, oos);
                     }
                     oos.close();
                     data.add(new SerialData(streamClass, oos.primitiveFieldData(), oos.objectFieldData(), oos.streamData()));

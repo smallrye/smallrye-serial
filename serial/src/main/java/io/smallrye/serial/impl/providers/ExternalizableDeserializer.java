@@ -8,6 +8,7 @@ import io.smallrye.serial.Serialized;
 import io.smallrye.serial.SerializedExternalizable;
 import io.smallrye.serial.SerializedExternalizableClass;
 import io.smallrye.serial.impl.CapturedObjectInput;
+import io.smallrye.serial.impl.DeserializerContextImpl;
 import io.smallrye.serial.impl.ReadUtil;
 import io.smallrye.serial.spi.ObjectDeserializer;
 
@@ -26,7 +27,8 @@ public final class ExternalizableDeserializer implements ObjectDeserializer {
             SerializedExternalizableClass serClazz = ext.serializedClass();
             Class<?> clazz = ctxt.deserializeClass(serClazz);
             if (Externalizable.class.isAssignableFrom(clazz)) {
-                Externalizable instance = ReadUtil.newExternalizableInstance(clazz.asSubclass(Externalizable.class));
+                Externalizable instance = ReadUtil.newExternalizableInstance((DeserializerContextImpl) ctxt,
+                        clazz.asSubclass(Externalizable.class));
                 ctxt.preSetObject(instance);
                 instance.readExternal(new CapturedObjectInput(ctxt, ext.data()));
                 return instance;
