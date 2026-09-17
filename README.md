@@ -1,16 +1,22 @@
-[![SmallRye Build](https://github.com/smallrye/smallrye-serial/workflows/SmallRye%20Build/badge.svg?branch=main)](https://github.com/smallrye/smallrye-serial/actions?query=workflow%3A%22SmallRye+Build%22)
+[![SmallRye Build](https://github.com/smallrye/smallrye-serial/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/smallrye/smallrye-serial/actions?query=workflow%3A%22SmallRye+Build%22)
 [![Maven Central](https://img.shields.io/maven-central/v/io.smallrye.serial/smallrye-serial?color=green)](https://search.maven.org/search?q=g:io.smallrye.serial)
 [![License](https://img.shields.io/github/license/smallrye/smallrye-serial.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
 # SmallRye Serial
 
 A safe and efficient Java serialization library that captures serialized object graphs
-into a structured, inspectable intermediate representation rather than an opaque byte stream.
+into a structured, inspectable intermediate representation, with full support for
+reading from and writing to standard Java serialization byte streams.
 
 ## Overview
 
-SmallRye Serial serializes Java objects into a tree of `Serialized` nodes that can be
-examined, transformed, or stored before being deserialized back into live objects.
+SmallRye Serial decouples the serialization process into two layers:
+
+1. **Object Graph to Representation**: Java objects are serialized into a tree of `Serialized` nodes that can be examined, transformed, or filtered.
+2. **Representation to Byte Stream**: The `Serialized` representation can be written to or read from the standard Java serialization wire format.
+
+This separation allows for secure class-filtering and graph-inspection before any live Java objects are actually instantiated.
+
 It supports the full range of Java serialization mechanisms:
 
 - `Serializable` classes (including custom `writeObject`/`readObject`)
@@ -39,19 +45,42 @@ Replace `VERSION` with the latest release version.
 
 ### Getting started
 
-Create a `SerialContext`, then use it to serialize and deserialize objects:
+First, configure a thread-safe `SerialContext` with standard serialization providers:
 
 ```java
-// Build a context with the default serialization providers
 SerialContext ctx = SerialContext.builder()
     .addDefaultProviders()
     .build();
+```
 
-// Serialize an object into its intermediate representation
-Serialized serialized = ctx.serialize(myObject);
+#### 1. Object to/from Intermediate Representation
 
-// Deserialize back into a live object
-Object restored = ctx.deserialize(serialized);
+Use the context to create a `Serializer` or `Deserializer` to convert between Java objects and `Serialized` representation nodes. While `SerialContext` is thread-safe, individual serializers and deserializers are not.
+
+```java
+// Create a serializer and serialize an object to its intermediate representation
+Serializer serializer = ctx.createSerializer();
+Serialized serialized = serializer.serialize(myObject);
+
+// Create a deserializer and deserialize back into a live object
+Deserializer deserializer = ctx.createDeserializer();
+Object restored = deserializer.deserialize(serialized);
+```
+
+#### 2. Intermediate Representation to/from Byte Stream
+
+Use `SerialStreamWriter` and `SerialStreamReader` to write and read the intermediate representation to/from raw streams using the standard Java serialization format (compatible with `ObjectOutputStream`/`ObjectInputStream` wire format).
+
+```java
+// Write the representation to a byte stream
+try (SerialStreamWriter writer = SerialStreamWriter.builder(outputStream).build()) {
+    writer.writeSerialized(serialized);
+}
+
+// Read the representation from a byte stream
+try (SerialStreamReader reader = SerialStreamReader.builder(inputStream).build()) {
+    Serialized readSerialized = reader.readSerialized();
+}
 ```
 
 ### JPMS module
